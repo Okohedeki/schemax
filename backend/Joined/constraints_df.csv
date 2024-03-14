@@ -1,0 +1,44 @@
+object_type,constraint_type,constraint_name,details,TABLE_NAME
+Table,Primary key,PK_Categories,CategoryID,Categories
+Table,Foreign key,FK_CustomerCustomerDemo,dbo.CustomerDemographics,CustomerCustomerDemo
+Table,Foreign key,FK_CustomerCustomerDemo_Customers,dbo.Customers,CustomerCustomerDemo
+Table,Primary key,PK_CustomerCustomerDemo,"CustomerID, CustomerTypeID",CustomerCustomerDemo
+Table,Primary key,PK_CustomerDemographics,CustomerTypeID,CustomerDemographics
+Table,Primary key,PK_Customers,CustomerID,Customers
+Table,Check constraint,CK_Birthdate,([BirthDate]<getdate()),Employees
+Table,Foreign key,FK_Employees_Employees,dbo.Employees,Employees
+Table,Primary key,PK_Employees,EmployeeID,Employees
+Table,Foreign key,FK_EmployeeTerritories_Employees,dbo.Employees,EmployeeTerritories
+Table,Foreign key,FK_EmployeeTerritories_Territories,dbo.Territories,EmployeeTerritories
+Table,Primary key,PK_EmployeeTerritories,"EmployeeID, TerritoryID",EmployeeTerritories
+Table,Check constraint,CK_Discount,([Discount]>=(0) AND [Discount]<=(1)),Order Details
+Table,Check constraint,CK_Quantity,([Quantity]>(0)),Order Details
+Table,Check constraint,CK_UnitPrice,([UnitPrice]>=(0)),Order Details
+Table,Default constraint,DF_Order_Details_Discount,Discount = ((0)),Order Details
+Table,Default constraint,DF_Order_Details_Quantity,Quantity = ((1)),Order Details
+Table,Default constraint,DF_Order_Details_UnitPrice,UnitPrice = ((0)),Order Details
+Table,Foreign key,FK_Order_Details_Orders,dbo.Orders,Order Details
+Table,Foreign key,FK_Order_Details_Products,dbo.Products,Order Details
+Table,Primary key,PK_Order_Details,"OrderID, ProductID",Order Details
+Table,Default constraint,DF_Orders_Freight,Freight = ((0)),Orders
+Table,Foreign key,FK_Orders_Customers,dbo.Customers,Orders
+Table,Foreign key,FK_Orders_Employees,dbo.Employees,Orders
+Table,Foreign key,FK_Orders_Shippers,dbo.Shippers,Orders
+Table,Primary key,PK_Orders,OrderID,Orders
+Table,Check constraint,CK_Products_UnitPrice,([UnitPrice]>=(0)),Products
+Table,Check constraint,CK_ReorderLevel,([ReorderLevel]>=(0)),Products
+Table,Check constraint,CK_UnitsInStock,([UnitsInStock]>=(0)),Products
+Table,Check constraint,CK_UnitsOnOrder,([UnitsOnOrder]>=(0)),Products
+Table,Default constraint,DF_Products_Discontinued,Discontinued = ((0)),Products
+Table,Default constraint,DF_Products_ReorderLevel,ReorderLevel = ((0)),Products
+Table,Default constraint,DF_Products_UnitPrice,UnitPrice = ((0)),Products
+Table,Default constraint,DF_Products_UnitsInStock,UnitsInStock = ((0)),Products
+Table,Default constraint,DF_Products_UnitsOnOrder,UnitsOnOrder = ((0)),Products
+Table,Foreign key,FK_Products_Categories,dbo.Categories,Products
+Table,Foreign key,FK_Products_Suppliers,dbo.Suppliers,Products
+Table,Primary key,PK_Products,ProductID,Products
+Table,Primary key,PK_Region,RegionID,Region
+Table,Primary key,PK_Shippers,ShipperID,Shippers
+Table,Primary key,PK_Suppliers,SupplierID,Suppliers
+Table,Foreign key,FK_Territories_Region,dbo.Region,Territories
+Table,Primary key,PK_Territories,TerritoryID,Territories

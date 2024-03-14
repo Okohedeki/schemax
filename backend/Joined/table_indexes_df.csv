@@ -1,0 +1,41 @@
+TableName,IndexName,IndexType,IsPrimaryKey,IsUnique,IsUniqueConstraint,COLUMN_NAME,IsDisabled
+Employees,idx_employees_names_title_birthdate,NONCLUSTERED,False,False,False,"LastName, FirstName, Title, BirthDate",False
+Employees,LastName,NONCLUSTERED,False,False,False,LastName,False
+Employees,PK_Employees,CLUSTERED,True,True,False,EmployeeID,False
+Employees,PostalCode,NONCLUSTERED,False,False,False,PostalCode,False
+Categories,CategoryName,NONCLUSTERED,False,False,False,CategoryName,False
+Categories,PK_Categories,CLUSTERED,True,True,False,CategoryID,False
+Customers,City,NONCLUSTERED,False,False,False,City,False
+Customers,CompanyName,NONCLUSTERED,False,False,False,CompanyName,False
+Customers,PK_Customers,CLUSTERED,True,True,False,CustomerID,False
+Customers,PostalCode,NONCLUSTERED,False,False,False,PostalCode,False
+Customers,Region,NONCLUSTERED,False,False,False,Region,False
+Shippers,PK_Shippers,CLUSTERED,True,True,False,ShipperID,False
+Suppliers,CompanyName,NONCLUSTERED,False,False,False,CompanyName,False
+Suppliers,PK_Suppliers,CLUSTERED,True,True,False,SupplierID,False
+Suppliers,PostalCode,NONCLUSTERED,False,False,False,PostalCode,False
+Orders,CustomerID,NONCLUSTERED,False,False,False,CustomerID,False
+Orders,CustomersOrders,NONCLUSTERED,False,False,False,CustomerID,False
+Orders,EmployeeID,NONCLUSTERED,False,False,False,EmployeeID,False
+Orders,EmployeesOrders,NONCLUSTERED,False,False,False,EmployeeID,False
+Orders,OrderDate,NONCLUSTERED,False,False,False,OrderDate,False
+Orders,PK_Orders,CLUSTERED,True,True,False,OrderID,False
+Orders,ShippedDate,NONCLUSTERED,False,False,False,ShippedDate,False
+Orders,ShippersOrders,NONCLUSTERED,False,False,False,ShipVia,False
+Orders,ShipPostalCode,NONCLUSTERED,False,False,False,ShipPostalCode,False
+Products,CategoriesProducts,NONCLUSTERED,False,False,False,CategoryID,False
+Products,CategoryID,NONCLUSTERED,False,False,False,CategoryID,False
+Products,PK_Products,CLUSTERED,True,True,False,ProductID,False
+Products,ProductName,NONCLUSTERED,False,False,False,ProductName,False
+Products,SupplierID,NONCLUSTERED,False,False,False,SupplierID,False
+Products,SuppliersProducts,NONCLUSTERED,False,False,False,SupplierID,False
+Order Details,OrderID,NONCLUSTERED,False,False,False,OrderID,False
+Order Details,OrdersOrder_Details,NONCLUSTERED,False,False,False,OrderID,False
+Order Details,PK_Order_Details,CLUSTERED,True,True,False,"OrderID, ProductID",False
+Order Details,ProductID,NONCLUSTERED,False,False,False,ProductID,False
+Order Details,ProductsOrder_Details,NONCLUSTERED,False,False,False,ProductID,False
+CustomerCustomerDemo,PK_CustomerCustomerDemo,NONCLUSTERED,True,True,False,"CustomerID, CustomerTypeID",False
+CustomerDemographics,PK_CustomerDemographics,NONCLUSTERED,True,True,False,CustomerTypeID,False
+Region,PK_Region,NONCLUSTERED,True,True,False,RegionID,False
+Territories,PK_Territories,NONCLUSTERED,True,True,False,TerritoryID,False
+EmployeeTerritories,PK_EmployeeTerritories,NONCLUSTERED,True,True,False,"EmployeeID, TerritoryID",False

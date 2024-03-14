@@ -1,0 +1,2728 @@
+text,total_num_physical_reads,min_rows,max_rows,query_hash,query_plan_hash,execution_count
+"SELECT 
+  name AS FunctionName,
+  create_date AS CreationDate,
+  modify_date AS LastModifiedDate,
+  OBJECT_DEFINITION(object_id) AS FunctionText
+    FROM 
+  sys.objects
+    WHERE 
+  type IN ('FN', 'IF', 'TF')  -- 'FN' for scalar functions, 'IF' for inline table-valued functions, 'TF' for multi-statement table-valued functions
+ORDER BY 
+  name;
+",1,3,3,0xb26d719bfe985e3b,0xc51757161357ed44,1
+"SELECT 
+  name AS ProcedureName,
+  create_date AS CreationDate,
+  modify_date AS LastModifiedDate,
+  OBJECT_DEFINITION(object_id) AS ProcedureText FROM 
+  sys.procedures
+    ORDER BY 
+  name;
+",0,7,7,0x57f610118d5bf121,0xc51757161357ed44,1
+"SELECT 
+  name AS ViewName,
+  OBJECT_DEFINITION(object_id) AS ViewDefinition
+  FROM 
+  sys.views;
+",1,16,16,0x37551f3c638d18f2,0x63fec5b8ede951bb,1
+"select table_view,
+    object_type, 
+    constraint_type,
+    constraint_name,
+    details
+from (
+    select schema_name(t.schema_id) + '.' + t.[name] as table_view, 
+        case when t.[type] = 'U' then 'Table'
+            when t.[type] = 'V' then 'View'
+            end as [object_type],
+        case when c.[type] = 'PK' then 'Primary key'
+            when c.[type] = 'UQ' then 'Unique constraint'
+            when i.[type] = 1 then 'Unique clustered index'
+            when i.type = 2 then 'Unique index'
+            end as constraint_type, 
+        isnull(c.[name], i.[name]) as constraint_name,
+        substring(column_names, 1, len(column_names)-1) as [details]
+    from sys.objects t
+        left outer join sys.indexes i
+            on t.object_id = i.object_id
+        left outer join sys.key_constraints c
+            on i.object_id = c.parent_object_id 
+            and i.index_id = c.unique_index_id
+      cross apply (select col.[name] + ', '
+                        from sys.index_columns ic
+                            inner join sys.columns col
+                                on ic.object_id = col.object_id
+                                and ic.column_id = col.column_id
+                        where ic.object_id = t.object_id
+                            and ic.index_id = i.index_id
+                                order by col.column_id
+                                for xml path ('') ) D (column_names)
+    where is_unique = 1
+    and t.is_ms_shipped <> 1
+    union all 
+    select schema_name(fk_tab.schema_id) + '.' + fk_tab.name as foreign_table,
+        'Table',
+        'Foreign key',
+        fk.name as fk_constraint_name,
+        schema_name(pk_tab.schema_id) + '.' + pk_tab.name
+    from sys.foreign_keys fk
+        inner join sys.tables fk_tab
+            on fk_tab.object_id = fk.parent_object_id
+        inner join sys.tables pk_tab
+            on pk_tab.object_id = fk.referenced_object_id
+        inner join sys.foreign_key_columns fk_cols
+            on fk_cols.constraint_object_id = fk.object_id
+    union all
+    select schema_name(t.schema_id) + '.' + t.[name],
+        'Table',
+        'Check constraint',
+        con.[name] as constraint_name,
+        con.[definition]
+    from sys.check_constraints con
+        left outer join sys.objects t
+            on con.parent_object_id = t.object_id
+        left outer join sys.all_columns col
+            on con.parent_column_id = col.column_id
+            and con.parent_object_id = col.object_id
+    union all
+    select schema_name(t.schema_id) + '.' + t.[name],
+        'Table',
+        'Default constraint',
+        con.[name],
+        col.[name] + ' = ' + con.[definition]
+    from sys.default_constraints con
+        left outer join sys.objects t
+            on con.parent_object_id = t.object_id
+        left outer join sys.all_columns col
+            on con.parent_column_id = col.column_id
+            and con.parent_object_id = col.object_id) a
+order by table_view, constraint_type, constraint_name
+",13,43,43,0x166d6a949bf40b65,0x7ce74837095fc4d2,1
+SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE='BASE TABLE',14,13,13,0x9830bd164abf68c4,0xd0ae1dedb21a8702,1
+"
+create procedure sys.sp_datatype_info_100
+(
+    @data_type int = 0,
+    @ODBCVer tinyint = 2
+)
+as
+    declare @mintype int
+    declare @maxtype int
+
+    set @ODBCVer = isnull(@ODBCVer, 2)
+    if @ODBCVer < 3 -- includes ODBC 1.0 as well
+        set @ODBCVer = 2
+    else
+        set @ODBCVer = 3
+
+    if @data_type = 0
+    begin
+        select @mintype = -32768
+        select @maxtype = 32767
+    end
+    else
+    begin
+        select @mintype = @data_type
+        select @maxtype = @data_type
+    end
+
+    select
+        TYPE_NAME           = v.TYPE_NAME,
+        DATA_TYPE           = v.DATA_TYPE,
+        PRECISION           = v.PRECISION,
+        LITERAL_PREFIX      = v.LITERAL_PREFIX,
+        LITERAL_SUFFIX      = v.LITERAL_SUFFIX,
+        CREATE_PARAMS       = v.CREATE_PARAMS,
+        NULLABLE            = v.NULLABLE,
+        CASE_SENSITIVE      = v.CASE_SENSITIVE,
+        SEARCHABLE          = v.SEARCHABLE,
+        UNSIGNED_ATTRIBUTE  = v.UNSIGNED_ATTRIBUTE,
+        MONEY               = v.MONEY,
+        AUTO_INCREMENT      = v.AUTO_INCREMENT,
+        LOCAL_TYPE_NAME     = v.LOCAL_TYPE_NAME,
+        MINIMUM_SCALE       = v.MINIMUM_SCALE,
+        MAXIMUM_SCALE       = v.MAXIMUM_SCALE,
+        SQL_DATA_TYPE       = v.SQL_DATA_TYPE,
+        SQL_DATETIME_SUB    = v.SQL_DATETIME_SUB,
+        NUM_PREC_RADIX      = v.NUM_PREC_RADIX,
+        INTERVAL_PRECISION  = v.INTERVAL_PRECISION,
+        USERTYPE            = v.USERTYPE
+
+    from
+        sys.spt_datatype_info_view v
+
+    where
+        v.DATA_TYPE between @mintype and @maxtype and
+        v.ODBCVer = @ODBCVer
+
+    order by 2, 12, 11, 20
+",1,1,3,0x4ce7ab9911f5c420,0x98a620f116243235,4
+"SELECT target_data
+									FROM sys.dm_xe_session_targets xet WITH(nolock)
+									JOIN sys.dm_xe_sessions xes WITH(nolock)
+									ON xes.address = xet.event_session_address
+									WHERE xes.name = 'telemetry_xevents'
+									AND xet.target_name = 'ring_buffer'",2,1,1,0x52b3b6cede6fc57a,0x99e42039e928e3d9,166
+"CREATE PROC sys.sp_flush_commit_table_on_demand (@numrows as BIGINT = NULL, @deleted_rows BIGINT = NULL OUTPUT, @date_cleanedup DATETIME = NULL OUTPUT, @cleanup_ts BIGINT = NULL OUTPUT) AS
+BEGIN
+
+	IF (is_member('db_owner') = 0)
+	BEGIN
+		raiserror(21050,0,1)
+		return 1
+	END
+
+
+	IF (@numrows<=0)
+	BEGIN
+		raiserror(23100,0,1)
+		return 1
+	END
+
+
+	SET DEADLOCK_PRIORITY LOW
+	
+	IF  EXISTS (SELECT * FROM sys.change_tracking_databases where database_id = DB_ID())
+	BEGIN
+		DECLARE @batch_size INT
+		IF (@numrows IS NULL or @numrows >= 4999)
+			SET @batch_size = 4999
+		ELSE
+			SET @batch_size = @numrows
+
+		-- checking for change tracking side table watermark
+		DECLARE @deleted_rowcount INT
+		SET		@cleanup_ts = change_tracking_hardened_cleanup_version ()
+		RAISERROR(22866,0,1,35502,@cleanup_ts)
+
+		-- checking for safe cleanup watermark
+		DECLARE @cleanup_version BIGINT
+		set @cleanup_version = safe_cleanup_version ()
+		RAISERROR(22866,0,1,35503,@cleanup_version)
+
+		IF @cleanup_ts > @cleanup_version
+			SET @cleanup_ts = @cleanup_version
+
+		SELECT @deleted_rowcount = 0, @deleted_rows = 0
+
+		WHILE (1=1)
+		BEGIN
+			DELETE TOP(@batch_size) sys.syscommittab WHERE commit_ts < @cleanup_ts
+			SELECT @deleted_rowcount = @@ROWCOUNT
+			SELECT @deleted_rows += @deleted_rowcount
+			SELECT @numrows -= @batch_size
+			IF ((@numrows IS NOT NULL AND @numrows <= 0 ) OR @deleted_rowcount < @batch_size)
+				BREAK;
+		END
+
+		select @date_cleanedup = min(commit_time) from sys.syscommittab where commit_ts = (select min(commit_ts) from sys.syscommittab)
+		IF (@date_cleanedup is null)
+			SET @date_cleanedup = GETUTCDATE()
+		
+	END
+	ELSE IF EXISTS (SELECT * FROM sys.databases WHERE DB_NAME() not in ('master', 'tempdb', 'model', 'msdb', 'mssqlsystemresource'))
+		TRUNCATE TABLE sys.syscommittab
+
+END
+",0,0,0,0x954c4b6bcbeaadc5,0xbb8159dff05600bf,27
+"CREATE PROC sys.sp_flush_commit_table_on_demand (@numrows as BIGINT = NULL, @deleted_rows BIGINT = NULL OUTPUT, @date_cleanedup DATETIME = NULL OUTPUT, @cleanup_ts BIGINT = NULL OUTPUT) AS
+BEGIN
+
+	IF (is_member('db_owner') = 0)
+	BEGIN
+		raiserror(21050,0,1)
+		return 1
+	END
+
+
+	IF (@numrows<=0)
+	BEGIN
+		raiserror(23100,0,1)
+		return 1
+	END
+
+
+	SET DEADLOCK_PRIORITY LOW
+	
+	IF  EXISTS (SELECT * FROM sys.change_tracking_databases where database_id = DB_ID())
+	BEGIN
+		DECLARE @batch_size INT
+		IF (@numrows IS NULL or @numrows >= 4999)
+			SET @batch_size = 4999
+		ELSE
+			SET @batch_size = @numrows
+
+		-- checking for change tracking side table watermark
+		DECLARE @deleted_rowcount INT
+		SET		@cleanup_ts = change_tracking_hardened_cleanup_version ()
+		RAISERROR(22866,0,1,35502,@cleanup_ts)
+
+		-- checking for safe cleanup watermark
+		DECLARE @cleanup_version BIGINT
+		set @cleanup_version = safe_cleanup_version ()
+		RAISERROR(22866,0,1,35503,@cleanup_version)
+
+		IF @cleanup_ts > @cleanup_version
+			SET @cleanup_ts = @cleanup_version
+
+		SELECT @deleted_rowcount = 0, @deleted_rows = 0
+
+		WHILE (1=1)
+		BEGIN
+			DELETE TOP(@batch_size) sys.syscommittab WHERE commit_ts < @cleanup_ts
+			SELECT @deleted_rowcount = @@ROWCOUNT
+			SELECT @deleted_rows += @deleted_rowcount
+			SELECT @numrows -= @batch_size
+			IF ((@numrows IS NOT NULL AND @numrows <= 0 ) OR @deleted_rowcount < @batch_size)
+				BREAK;
+		END
+
+		select @date_cleanedup = min(commit_time) from sys.syscommittab where commit_ts = (select min(commit_ts) from sys.syscommittab)
+		IF (@date_cleanedup is null)
+			SET @date_cleanedup = GETUTCDATE()
+		
+	END
+	ELSE IF EXISTS (SELECT * FROM sys.databases WHERE DB_NAME() not in ('master', 'tempdb', 'model', 'msdb', 'mssqlsystemresource'))
+		TRUNCATE TABLE sys.syscommittab
+
+END
+",0,0,0,0x8aa72a22c8093497,0xeeebd27bb84cd7aa,27
+"if exists(select * from sys.server_event_sessions where name='telemetry_xevents')
+	drop event session telemetry_xevents on server
+
+create event session telemetry_xevents on server
+ ADD EVENT [sqlserver].[error_reported]
+(
+WHERE severity >= 16
+or (error_number = 18456
+    or error_number = 17803 or error_number = 701 or error_number = 802 or error_number = 8645 or error_number = 8651
+    or error_number = 8657 or error_number = 8902 or error_number = 41354 or error_number = 41355 or error_number = 41367
+    or error_number = 41384 or error_number = 41336 or error_number = 41309 or error_number = 41312 or error_number = 41313
+    or error_number = 33065 or error_number = 33066)
+),
+
+ ADD EVENT [sqlserver].[missing_column_statistics],
+
+ ADD EVENT [sqlserver].[missing_join_predicate],
+
+ ADD EVENT [sqlserver].[server_memory_change],
+
+ ADD EVENT [sqlserver].[stretch_database_disable_completed],
+
+ ADD EVENT [sqlserver].[stretch_database_enable_completed],
+
+ ADD EVENT [sqlserver].[stretch_database_reauthorize_completed],
+
+ ADD EVENT [sqlserver].[stretch_index_reconciliation_codegen_completed],
+
+ ADD EVENT [sqlserver].[stretch_remote_column_execution_completed],
+
+ ADD EVENT [sqlserver].[stretch_remote_column_reconciliation_codegen_completed],
+
+ ADD EVENT [sqlserver].[stretch_remote_index_execution_completed],
+
+ ADD EVENT [sqlserver].[stretch_table_codegen_completed],
+
+ ADD EVENT [sqlserver].[stretch_table_alter_ddl],
+
+ ADD EVENT [sqlserver].[stretch_table_create_ddl],
+
+ ADD EVENT [sqlserver].[stretch_table_predicate_not_specified],
+
+ ADD EVENT [sqlserver].[stretch_table_predicate_specified],
+
+ ADD EVENT [sqlserver].[stretch_table_remote_creation_completed],
+
+ ADD EVENT [sqlserver].[stretch_table_row_migration_results_event],
+
+ ADD EVENT [sqlserver].[stretch_table_row_unmigration_results_event],
+
+ ADD EVENT [sqlserver].[stretch_table_data_reconciliation_results_event],
+
+ ADD EVENT [sqlserver].[stretch_table_unprovision_completed],
+
+ ADD EVENT [sqlserver].[stretch_table_validation_error],
+
+ ADD EVENT [sqlserver].[stretch_table_hinted_admin_update_event],
+
+ ADD EVENT [sqlserver].[stretch_table_hinted_admin_delete_event],
+
+ ADD EVENT [sqlserver].[stretch_table_query_error],
+
+ ADD EVENT [sqlserver].[stretch_remote_error],
+
+ ADD EVENT [sqlserver].[stretch_query_telemetry],
+
+ ADD EVENT [sqlserver].[temporal_ddl_system_versioning],
+
+ ADD EVENT [sqlserver].[temporal_dml_transaction_fail],
+
+ ADD EVENT [sqlserver].[temporal_ddl_period_add],
+
+ ADD EVENT [sqlserver].[temporal_ddl_period_drop],
+
+ ADD EVENT [sqlserver].[temporal_ddl_schema_check_fail],
+
+ ADD EVENT [sqlserver].[data_masking_ddl_column_definition],
+
+ ADD EVENT [sqlserver].[data_masking_traffic],
+
+ ADD EVENT [sqlserver].[data_masking_traffic_masked_only],
+
+ ADD EVENT [sqlserver].[data_classification_ddl_column_definition],
+
+ ADD EVENT [sqlserver].[data_classification_traffic],
+
+ ADD EVENT [sqlserver].[data_classification_auditing_traffic],
+
+ ADD EVENT [sqlserver].[feature_restriction_ddl],
+
+ ADD EVENT [sqlserver].[feature_restriction_usage],
+
+ ADD EVENT [sqlserver].[always_encrypted_query_count],
+
+ ADD EVENT [sqlserver].[rls_query_count],
+
+ ADD EVENT [sqlserver].[auto_stats],
+
+ ADD EVENT [sqlserver].[database_cmptlevel_change],
+
+ ADD EVENT [sqlserver].[database_created],
+
+ ADD EVENT [sqlserver].[database_dropped],
+
+ ADD EVENT [sqlserver].[reason_many_foreign_keys_operator_not_used],
+
+ ADD EVENT [sqlserver].[interleaved_exec_status],
+
+ ADD EVENT [sqlserver].[table_variable_deferred_compilation],
+
+ ADD EVENT [sqlserver].[graph_match_query_compiled],
+
+ ADD EVENT [sqlserver].[approximate_count_distinct_query_compiled],
+
+ ADD EVENT [sqlserver].[login_protocol_count],
+
+ ADD EVENT [sqlserver].[column_store_index_build_low_memory],
+
+ ADD EVENT [sqlserver].[column_store_index_build_throttle],
+
+ ADD EVENT [sqlserver].[columnstore_delete_buffer_flush_failed],
+
+ ADD EVENT [sqlserver].[columnstore_delta_rowgroup_closed],
+
+ ADD EVENT [sqlserver].[columnstore_index_reorg_failed],
+
+ ADD EVENT [sqlserver].[columnstore_log_exception],
+
+ ADD EVENT [sqlserver].[columnstore_rowgroup_merge_failed],
+
+ ADD EVENT [sqlserver].[columnstore_tuple_mover_delete_buffer_truncate_timed_out],
+
+ ADD EVENT [sqlserver].[columnstore_tuple_mover_end_compress],
+
+ ADD EVENT [sqlserver].[query_memory_grant_blocking],
+
+ ADD EVENT [sqlserver].[natively_compiled_module_inefficiency_detected],
+
+ ADD EVENT [sqlserver].[natively_compiled_proc_slow_parameter_passing],
+
+ ADD EVENT [sqlserver].[xtp_alter_table],
+
+ ADD EVENT [sqlserver].[xtp_db_delete_only_mode_updatedhktrimlsn],
+
+ ADD EVENT [sqlserver].[xtp_stgif_container_added],
+
+ ADD EVENT [sqlserver].[xtp_stgif_container_deleted],
+
+ ADD EVENT [xtpcompile].[cl_duration],
+
+ ADD EVENT [xtpengine].[xtp_physical_db_restarted],
+
+ ADD EVENT [xtpengine].[xtp_db_delete_only_mode_enter],
+
+ ADD EVENT [xtpengine].[xtp_db_delete_only_mode_update],
+
+ ADD EVENT [xtpengine].[xtp_db_delete_only_mode_exit],
+
+ ADD EVENT [xtpengine].[parallel_alter_stats],
+
+ ADD EVENT [xtpengine].[serial_alter_stats],
+
+ ADD EVENT [sqlserver].[json_function_compiled]
+(
+ACTION ([database_id])
+),
+
+ ADD EVENT [sqlserver].[string_escape_compiled]
+(
+ACTION ([database_id])
+),
+
+ ADD EVENT [sqlserver].[window_function_used]
+(
+ACTION ([database_id])
+),
+
+ ADD EVENT [sqlserver].[sequence_function_used]
+(
+ACTION ([database_id])
+),
+
+ ADD EVENT [qds].[query_store_db_diagnostics],
+
+ ADD EVENT [sqlserver].[index_defragmentation],
+
+ ADD EVENT [sqlserver].[create_index_event],
+
+ ADD EVENT [sqlserver].[index_build_error_event],
+
+ ADD EVENT [sqlserver].[alter_column_event],
+
+ ADD EVENT [sqlserver].[cardinality_estimation_version_usage],
+
+ ADD EVENT [sqlserver].[query_optimizer_compatibility_level_hint_usage],
+
+ ADD EVENT [sqlserver].[query_tsql_scalar_udf_inlined],
+
+ ADD EVENT [sqlserver].[tsql_scalar_udf_not_inlineable],
+
+ ADD EVENT [sqlserver].[recovery_checkpoint_stats],
+
+ ADD EVENT [sqlserver].[multistep_execution]
+(
+ACTION ([database_id])
+),
+
+ ADD EVENT [sqlserver].[fulltext_filter_usage],
+
+ ADD EVENT [sqlserver].[tx_commit_abort_stats],
+
+ ADD EVENT [sqlserver].[server_start_stop]
+add target package0.ring_buffer
+(set occurrence_number = 100)
+with
+(
+	MAX_DISPATCH_LATENCY = 120 SECONDS,
+	MAX_MEMORY = 4 MB,
+	startup_state = on
+)
+if not exists (select * from sys.dm_xe_sessions where name = 'telemetry_xevents')
+	alter event session telemetry_xevents on server state=start
+",0,0,0,0x19922f196e11684f,0xc991394b6dc1cf85,15
+"if exists(select * from sys.server_event_sessions where name='telemetry_xevents')
+	drop event session telemetry_xevents on server
+
+create event session telemetry_xevents on server
+ ADD EVENT [sqlserver].[error_reported]
+(
+WHERE severity >= 16
+or (error_number = 18456
+    or error_number = 17803 or error_number = 701 or error_number = 802 or error_number = 8645 or error_number = 8651
+    or error_number = 8657 or error_number = 8902 or error_number = 41354 or error_number = 41355 or error_number = 41367
+    or error_number = 41384 or error_number = 41336 or error_number = 41309 or error_number = 41312 or error_number = 41313
+    or error_number = 33065 or error_number = 33066)
+),
+
+ ADD EVENT [sqlserver].[missing_column_statistics],
+
+ ADD EVENT [sqlserver].[missing_join_predicate],
+
+ ADD EVENT [sqlserver].[server_memory_change],
+
+ ADD EVENT [sqlserver].[stretch_database_disable_completed],
+
+ ADD EVENT [sqlserver].[stretch_database_enable_completed],
+
+ ADD EVENT [sqlserver].[stretch_database_reauthorize_completed],
+
+ ADD EVENT [sqlserver].[stretch_index_reconciliation_codegen_completed],
+
+ ADD EVENT [sqlserver].[stretch_remote_column_execution_completed],
+
+ ADD EVENT [sqlserver].[stretch_remote_column_reconciliation_codegen_completed],
+
+ ADD EVENT [sqlserver].[stretch_remote_index_execution_completed],
+
+ ADD EVENT [sqlserver].[stretch_table_codegen_completed],
+
+ ADD EVENT [sqlserver].[stretch_table_alter_ddl],
+
+ ADD EVENT [sqlserver].[stretch_table_create_ddl],
+
+ ADD EVENT [sqlserver].[stretch_table_predicate_not_specified],
+
+ ADD EVENT [sqlserver].[stretch_table_predicate_specified],
+
+ ADD EVENT [sqlserver].[stretch_table_remote_creation_completed],
+
+ ADD EVENT [sqlserver].[stretch_table_row_migration_results_event],
+
+ ADD EVENT [sqlserver].[stretch_table_row_unmigration_results_event],
+
+ ADD EVENT [sqlserver].[stretch_table_data_reconciliation_results_event],
+
+ ADD EVENT [sqlserver].[stretch_table_unprovision_completed],
+
+ ADD EVENT [sqlserver].[stretch_table_validation_error],
+
+ ADD EVENT [sqlserver].[stretch_table_hinted_admin_update_event],
+
+ ADD EVENT [sqlserver].[stretch_table_hinted_admin_delete_event],
+
+ ADD EVENT [sqlserver].[stretch_table_query_error],
+
+ ADD EVENT [sqlserver].[stretch_remote_error],
+
+ ADD EVENT [sqlserver].[stretch_query_telemetry],
+
+ ADD EVENT [sqlserver].[temporal_ddl_system_versioning],
+
+ ADD EVENT [sqlserver].[temporal_dml_transaction_fail],
+
+ ADD EVENT [sqlserver].[temporal_ddl_period_add],
+
+ ADD EVENT [sqlserver].[temporal_ddl_period_drop],
+
+ ADD EVENT [sqlserver].[temporal_ddl_schema_check_fail],
+
+ ADD EVENT [sqlserver].[data_masking_ddl_column_definition],
+
+ ADD EVENT [sqlserver].[data_masking_traffic],
+
+ ADD EVENT [sqlserver].[data_masking_traffic_masked_only],
+
+ ADD EVENT [sqlserver].[data_classification_ddl_column_definition],
+
+ ADD EVENT [sqlserver].[data_classification_traffic],
+
+ ADD EVENT [sqlserver].[data_classification_auditing_traffic],
+
+ ADD EVENT [sqlserver].[feature_restriction_ddl],
+
+ ADD EVENT [sqlserver].[feature_restriction_usage],
+
+ ADD EVENT [sqlserver].[always_encrypted_query_count],
+
+ ADD EVENT [sqlserver].[rls_query_count],
+
+ ADD EVENT [sqlserver].[auto_stats],
+
+ ADD EVENT [sqlserver].[database_cmptlevel_change],
+
+ ADD EVENT [sqlserver].[database_created],
+
+ ADD EVENT [sqlserver].[database_dropped],
+
+ ADD EVENT [sqlserver].[reason_many_foreign_keys_operator_not_used],
+
+ ADD EVENT [sqlserver].[interleaved_exec_status],
+
+ ADD EVENT [sqlserver].[table_variable_deferred_compilation],
+
+ ADD EVENT [sqlserver].[graph_match_query_compiled],
+
+ ADD EVENT [sqlserver].[approximate_count_distinct_query_compiled],
+
+ ADD EVENT [sqlserver].[login_protocol_count],
+
+ ADD EVENT [sqlserver].[column_store_index_build_low_memory],
+
+ ADD EVENT [sqlserver].[column_store_index_build_throttle],
+
+ ADD EVENT [sqlserver].[columnstore_delete_buffer_flush_failed],
+
+ ADD EVENT [sqlserver].[columnstore_delta_rowgroup_closed],
+
+ ADD EVENT [sqlserver].[columnstore_index_reorg_failed],
+
+ ADD EVENT [sqlserver].[columnstore_log_exception],
+
+ ADD EVENT [sqlserver].[columnstore_rowgroup_merge_failed],
+
+ ADD EVENT [sqlserver].[columnstore_tuple_mover_delete_buffer_truncate_timed_out],
+
+ ADD EVENT [sqlserver].[columnstore_tuple_mover_end_compress],
+
+ ADD EVENT [sqlserver].[query_memory_grant_blocking],
+
+ ADD EVENT [sqlserver].[natively_compiled_module_inefficiency_detected],
+
+ ADD EVENT [sqlserver].[natively_compiled_proc_slow_parameter_passing],
+
+ ADD EVENT [sqlserver].[xtp_alter_table],
+
+ ADD EVENT [sqlserver].[xtp_db_delete_only_mode_updatedhktrimlsn],
+
+ ADD EVENT [sqlserver].[xtp_stgif_container_added],
+
+ ADD EVENT [sqlserver].[xtp_stgif_container_deleted],
+
+ ADD EVENT [xtpcompile].[cl_duration],
+
+ ADD EVENT [xtpengine].[xtp_physical_db_restarted],
+
+ ADD EVENT [xtpengine].[xtp_db_delete_only_mode_enter],
+
+ ADD EVENT [xtpengine].[xtp_db_delete_only_mode_update],
+
+ ADD EVENT [xtpengine].[xtp_db_delete_only_mode_exit],
+
+ ADD EVENT [xtpengine].[parallel_alter_stats],
+
+ ADD EVENT [xtpengine].[serial_alter_stats],
+
+ ADD EVENT [sqlserver].[json_function_compiled]
+(
+ACTION ([database_id])
+),
+
+ ADD EVENT [sqlserver].[string_escape_compiled]
+(
+ACTION ([database_id])
+),
+
+ ADD EVENT [sqlserver].[window_function_used]
+(
+ACTION ([database_id])
+),
+
+ ADD EVENT [sqlserver].[sequence_function_used]
+(
+ACTION ([database_id])
+),
+
+ ADD EVENT [qds].[query_store_db_diagnostics],
+
+ ADD EVENT [sqlserver].[index_defragmentation],
+
+ ADD EVENT [sqlserver].[create_index_event],
+
+ ADD EVENT [sqlserver].[index_build_error_event],
+
+ ADD EVENT [sqlserver].[alter_column_event],
+
+ ADD EVENT [sqlserver].[cardinality_estimation_version_usage],
+
+ ADD EVENT [sqlserver].[query_optimizer_compatibility_level_hint_usage],
+
+ ADD EVENT [sqlserver].[query_tsql_scalar_udf_inlined],
+
+ ADD EVENT [sqlserver].[tsql_scalar_udf_not_inlineable],
+
+ ADD EVENT [sqlserver].[recovery_checkpoint_stats],
+
+ ADD EVENT [sqlserver].[multistep_execution]
+(
+ACTION ([database_id])
+),
+
+ ADD EVENT [sqlserver].[fulltext_filter_usage],
+
+ ADD EVENT [sqlserver].[tx_commit_abort_stats],
+
+ ADD EVENT [sqlserver].[server_start_stop]
+add target package0.ring_buffer
+(set occurrence_number = 100)
+with
+(
+	MAX_DISPATCH_LATENCY = 120 SECONDS,
+	MAX_MEMORY = 4 MB,
+	startup_state = on
+)
+if not exists (select * from sys.dm_xe_sessions where name = 'telemetry_xevents')
+	alter event session telemetry_xevents on server state=start
+",0,0,0,0x6efba46b2d06029c,0xadcb4ee0aada1041,15
+"
+           
+       DECLARE @msticks bigint, @mstickstime datetime, @LastHour datetime
+                SELECT @mstickstime = GETDATE(), @msticks = ms_ticks from sys.dm_os_sys_info
+                SELECT @LastHour = DATEADD(HOUR, -1, @mstickstime);
+                
+                WITH Quartiles AS (
+                SELECT DISTINCT       
+                    CONVERT(VARCHAR(10), CAST(DATEADD (ms, -1 * (@msticks - [timestamp]),@mstickstime) AS DATE), 112) EventDate,
+                       CONVERT(VARCHAR(30), TIMEFROMPARTS(DATEPART(HOUR, DATEADD (ms, -1 * (@msticks - [timestamp]),@mstickstime)), 00,00,00,00), 114) AS [EventTime],         
+                       PERCENTILE_DISC(0.5) WITHIN GROUP (ORDER BY record.value('(Record/SchedulerMonitorEvent/SystemHealth/ProcessUtilization)[1]', 'int')
+                           )
+                           OVER (PARTITION BY CONVERT(VARCHAR(10), CAST(DATEADD (ms, -1 * (@msticks - [timestamp]),@mstickstime) AS DATE), 112),
+                                  CONVERT(VARCHAR(30), TIMEFROMPARTS(DATEPART(HOUR, DATEADD (ms, -1 * (@msticks - [timestamp]),@mstickstime)), 00,00,00,00), 114)
+                           ) AS MedianSQLCPU
+                           ,           
+                       PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY record.value('(Record/SchedulerMonitorEvent/SystemHealth/ProcessUtilization)[1]', 'int')
+                           )
+                           OVER (PARTITION BY CONVERT(VARCHAR(10), CAST(DATEADD (ms, -1 * (@msticks - [timestamp]),@mstickstime) AS DATE), 112),
+                                  CONVERT(VARCHAR(30), TIMEFROMPARTS(DATEPART(HOUR, DATEADD (ms, -1 * (@msticks - [timestamp]),@mstickstime)), 00,00,00,00), 114)
+                           ) AS Q3SQLCPU
+                     ,           
+                       PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY record.value('(Record/SchedulerMonitorEvent/SystemHealth/ProcessUtilization)[1]', 'int')
+                           )
+                           OVER (PARTITION BY CONVERT(VARCHAR(10), CAST(DATEADD (ms, -1 * (@msticks - [timestamp]),@mstickstime) AS DATE), 112),
+                                  CONVERT(VARCHAR(30), TIMEFROMPARTS(DATEPART(HOUR, DATEADD (ms, -1 * (@msticks - [timestamp]),@mstickstime)), 00,00,00,00), 114)
+                           ) AS Q1SQLCPU
+                  FROM (
+                    SELECT timestamp, CONVERT (xml, record) AS 'record' 
+                    FROM sys.dm_os_ring_buffers 
+                    WHERE ring_buffer_type = 'RING_BUFFER_SCHEDULER_MONITOR'
+                      AND record LIKE '%<SystemHealth>%'
+                            ) AS t
+                     WHERE DATEPART(HOUR, DATEADD (ms, -1 * (@msticks - [timestamp]),@mstickstime)) = DATEPART(HOUR, @LastHour)
+                     AND CAST(DATEADD (ms, -1 * (@msticks - [timestamp]),@mstickstime) AS DATE) = CAST(@LastHour AS DATE)
+              ),
+              SimpleStats AS (
+                SELECT         
+                    CONVERT(VARCHAR(10), CAST(DATEADD (ms, -1 * (@msticks - [timestamp]),@mstickstime) AS DATE), 112) EventDate,
+                       CONVERT(VARCHAR(30), TIMEFROMPARTS(DATEPART(HOUR, DATEADD (ms, -1 * (@msticks - [timestamp]),@mstickstime)), 00,00,00,00), 114) AS [EventTime],  
+                    MAX(record.value('(Record/SchedulerMonitorEvent/SystemHealth/ProcessUtilization)[1]', 'int')) AS [MaxSQLCPU], 
+                       MIN(record.value('(Record/SchedulerMonitorEvent/SystemHealth/ProcessUtilization)[1]', 'int')) AS [MinSQLCPU], 
+                       AVG(record.value('(Record/SchedulerMonitorEvent/SystemHealth/ProcessUtilization)[1]', 'int')) AS [AvgSQLCPU]          
+                  FROM (
+                    SELECT timestamp, CONVERT (xml, record) AS 'record' 
+                    FROM sys.dm_os_ring_buffers 
+                    WHERE ring_buffer_type = 'RING_BUFFER_SCHEDULER_MONITOR'
+                      AND record LIKE '%<SystemHealth>%'
+                            ) AS t
+              WHERE DATEPART(HOUR, DATEADD (ms, -1 * (@msticks - [timestamp]),@mstickstime)) = DATEPART(HOUR, @LastHour)
+                     AND CAST(DATEADD (ms, -1 * (@msticks - [timestamp]),@mstickstime) AS DATE) = CAST(@LastHour AS DATE)
+              GROUP BY 
+                     CONVERT(VARCHAR(10), CAST(DATEADD (ms, -1 * (@msticks - [timestamp]),@mstickstime) AS DATE), 112) ,
+                     CONVERT(VARCHAR(30), TIMEFROMPARTS(DATEPART(HOUR, DATEADD (ms, -1 * (@msticks - [timestamp]),@mstickstime)), 00,00,00,00), 114) 
+              )
+              SELECT 
+                     ss.EventDate AS EventDate,
+                     ss.EventTime AS EventTime,
+                     ss.MaxSQLCPU,
+                     ss.MinSQLCPU,
+                     ss.AvgSQLCPU,
+                     q.MedianSQLCPU,
+                     q.Q1SQLCPU,
+                     q.Q3SQLCPU
+              FROM SimpleStats ss
+                     INNER JOIN Quartiles q
+                           ON q.EventDate = ss.EventDate
+                           AND q.EventTime = ss.EventTime
+     ",1,1,1,0x6b190b5a26bb6fdb,0xbc41c3737af663ea,14
+"
+           
+       DECLARE @msticks bigint, @mstickstime datetime, @LastHour datetime
+                SELECT @mstickstime = GETDATE(), @msticks = ms_ticks from sys.dm_os_sys_info
+                SELECT @LastHour = DATEADD(HOUR, -1, @mstickstime);
+                
+                WITH Quartiles AS (
+                SELECT DISTINCT       
+                    CONVERT(VARCHAR(10), CAST(DATEADD (ms, -1 * (@msticks - [timestamp]),@mstickstime) AS DATE), 112) EventDate,
+                       CONVERT(VARCHAR(30), TIMEFROMPARTS(DATEPART(HOUR, DATEADD (ms, -1 * (@msticks - [timestamp]),@mstickstime)), 00,00,00,00), 114) AS [EventTime],         
+                       PERCENTILE_DISC(0.5) WITHIN GROUP (ORDER BY record.value('(Record/SchedulerMonitorEvent/SystemHealth/ProcessUtilization)[1]', 'int')
+                           )
+                           OVER (PARTITION BY CONVERT(VARCHAR(10), CAST(DATEADD (ms, -1 * (@msticks - [timestamp]),@mstickstime) AS DATE), 112),
+                                  CONVERT(VARCHAR(30), TIMEFROMPARTS(DATEPART(HOUR, DATEADD (ms, -1 * (@msticks - [timestamp]),@mstickstime)), 00,00,00,00), 114)
+                           ) AS MedianSQLCPU
+                           ,           
+                       PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY record.value('(Record/SchedulerMonitorEvent/SystemHealth/ProcessUtilization)[1]', 'int')
+                           )
+                           OVER (PARTITION BY CONVERT(VARCHAR(10), CAST(DATEADD (ms, -1 * (@msticks - [timestamp]),@mstickstime) AS DATE), 112),
+                                  CONVERT(VARCHAR(30), TIMEFROMPARTS(DATEPART(HOUR, DATEADD (ms, -1 * (@msticks - [timestamp]),@mstickstime)), 00,00,00,00), 114)
+                           ) AS Q3SQLCPU
+                     ,           
+                       PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY record.value('(Record/SchedulerMonitorEvent/SystemHealth/ProcessUtilization)[1]', 'int')
+                           )
+                           OVER (PARTITION BY CONVERT(VARCHAR(10), CAST(DATEADD (ms, -1 * (@msticks - [timestamp]),@mstickstime) AS DATE), 112),
+                                  CONVERT(VARCHAR(30), TIMEFROMPARTS(DATEPART(HOUR, DATEADD (ms, -1 * (@msticks - [timestamp]),@mstickstime)), 00,00,00,00), 114)
+                           ) AS Q1SQLCPU
+                  FROM (
+                    SELECT timestamp, CONVERT (xml, record) AS 'record' 
+                    FROM sys.dm_os_ring_buffers 
+                    WHERE ring_buffer_type = 'RING_BUFFER_SCHEDULER_MONITOR'
+                      AND record LIKE '%<SystemHealth>%'
+                            ) AS t
+                     WHERE DATEPART(HOUR, DATEADD (ms, -1 * (@msticks - [timestamp]),@mstickstime)) = DATEPART(HOUR, @LastHour)
+                     AND CAST(DATEADD (ms, -1 * (@msticks - [timestamp]),@mstickstime) AS DATE) = CAST(@LastHour AS DATE)
+              ),
+              SimpleStats AS (
+                SELECT         
+                    CONVERT(VARCHAR(10), CAST(DATEADD (ms, -1 * (@msticks - [timestamp]),@mstickstime) AS DATE), 112) EventDate,
+                       CONVERT(VARCHAR(30), TIMEFROMPARTS(DATEPART(HOUR, DATEADD (ms, -1 * (@msticks - [timestamp]),@mstickstime)), 00,00,00,00), 114) AS [EventTime],  
+                    MAX(record.value('(Record/SchedulerMonitorEvent/SystemHealth/ProcessUtilization)[1]', 'int')) AS [MaxSQLCPU], 
+                       MIN(record.value('(Record/SchedulerMonitorEvent/SystemHealth/ProcessUtilization)[1]', 'int')) AS [MinSQLCPU], 
+                       AVG(record.value('(Record/SchedulerMonitorEvent/SystemHealth/ProcessUtilization)[1]', 'int')) AS [AvgSQLCPU]          
+                  FROM (
+                    SELECT timestamp, CONVERT (xml, record) AS 'record' 
+                    FROM sys.dm_os_ring_buffers 
+                    WHERE ring_buffer_type = 'RING_BUFFER_SCHEDULER_MONITOR'
+                      AND record LIKE '%<SystemHealth>%'
+                            ) AS t
+              WHERE DATEPART(HOUR, DATEADD (ms, -1 * (@msticks - [timestamp]),@mstickstime)) = DATEPART(HOUR, @LastHour)
+                     AND CAST(DATEADD (ms, -1 * (@msticks - [timestamp]),@mstickstime) AS DATE) = CAST(@LastHour AS DATE)
+              GROUP BY 
+                     CONVERT(VARCHAR(10), CAST(DATEADD (ms, -1 * (@msticks - [timestamp]),@mstickstime) AS DATE), 112) ,
+                     CONVERT(VARCHAR(30), TIMEFROMPARTS(DATEPART(HOUR, DATEADD (ms, -1 * (@msticks - [timestamp]),@mstickstime)), 00,00,00,00), 114) 
+              )
+              SELECT 
+                     ss.EventDate AS EventDate,
+                     ss.EventTime AS EventTime,
+                     ss.MaxSQLCPU,
+                     ss.MinSQLCPU,
+                     ss.AvgSQLCPU,
+                     q.MedianSQLCPU,
+                     q.Q1SQLCPU,
+                     q.Q3SQLCPU
+              FROM SimpleStats ss
+                     INNER JOIN Quartiles q
+                           ON q.EventDate = ss.EventDate
+                           AND q.EventTime = ss.EventTime
+     ",0,0,1,0x6e87acc6e9467f77,0xb5b4f05d85b03660,14
+"SELECT  TOP 30 d.[name]
+FROM    sys.databases d WITH(nolock)
+	   INNER JOIN sys.master_files mf WITH(nolock)
+			  ON mf.database_id = d.database_id 
+	   LEFT OUTER JOIN sys.database_mirroring dm WITH(nolock)
+			  ON dm.database_id = d.database_id
+	   LEFT OUTER JOIN sys.dm_hadr_database_replica_states hadr WITH(nolock)
+			  ON hadr.[database_id] = d.[database_id]
+WHERE d.[state] NOT BETWEEN 1 AND 6 -- online only
+AND d.[user_access] NOT IN (1, 2) -- multi user
+AND d.[source_database_id] IS NULL -- not snapshot
+AND d.[name] NOT IN ('master', 'tempdb', 'model', 'msdb') -- not system
+AND ISNULL(dm.[mirroring_role], 1) = 1 -- either principal or not mirrored
+AND d.[is_in_standby] = 0 -- not standby
+AND DATABASEPROPERTYEX(d.[name], 'Collation') IS NOT NULL -- started
+AND ISNULL(hadr.[database_state], 0) = 0 -- online in HADR
+GROUP BY d.[name] 
+ORDER BY SUM(mf.size) DESC -- sampling using size
+",1,0,0,0xdf7f26cdda1c98c3,0xb0c169573abb1ee2,1
+"
+    SELECT  mf.database_id, db.is_accelerated_database_recovery_on, mf.size as 'Data Size'
+	,mf_logs.size as 'Log Size', mf.size * 8/1024 'Data Size (MB)',
+	mf_logs.size * 8/1024.0 'Log Size (MB)',
+	pvs.persistent_version_store_size_kb,
+	pvs.online_index_version_store_size_kb, pvs.current_aborted_transaction_count, pvs.pvs_off_row_page_skipped_low_water_mark,
+	pvs.pvs_off_row_page_skipped_min_useful_xts, pvs.pvs_off_row_page_skipped_oldest_active_xdesid
+	FROM sys.master_files mf
+	LEFT JOIN sys.master_files mf_logs
+	ON mf_logs.database_id = mf.database_id
+	AND mf_logs.type_desc = 'LOG'
+	JOIN sys.dm_tran_persistent_version_store_stats pvs ON mf.database_id = pvs.database_id
+	JOIN sys.databases db ON mf.database_id = db.database_id
+	WHERE mf.type_desc = 'ROWS';
+    ",0,4,4,0x7425733b989c0270,0xbf562b9111344786,1
+"
+    SELECT 
+    CASE 
+        WHEN name like  '%msdtcprx.dll%' THEN 'msdtcprx'
+        WHEN name like  '%sqljdbc_xa.dll%' THEN 'sqljdbc_xa'
+        ELSE NULL 
+    END AS LoadedModules,
+    COUNT(1) AS ModuleCount
+        FROM sys.dm_os_loaded_modules WITH (NOLOCK)
+        WHERE name like  '%msdtcprx.dll%' 
+    OR name like  '%sqljdbc_xa.dll%'
+        GROUP BY 
+    CASE WHEN name like  '%msdtcprx.dll%' THEN 'msdtcprx'
+        WHEN name like  '%sqljdbc_xa.dll%' THEN 'sqljdbc_xa'
+        ELSE NULL 
+    END;
+    ",0,0,0,0x4fb7b87706f3c8bd,0x44c8488a78d0df58,1
+"
+    SELECT COUNT_BIG(DISTINCT transaction_uow) DTCActiveTransactions
+        FROM sys.dm_tran_active_transactions WITH (NOLOCK)
+        WHERE name = 'DTC Transaction';
+    ",0,1,1,0xb2c35a45f02fcc6a,0x48f21ed5c0bd29ee,1
+"
+      select 1 IsPolybaseCluster
+      where exists (select * from sys.dm_cluster_endpoints)
+    ",0,0,0,0xe589dacb0092a7f5,0xbc984c80faa37654,1
+"
+      SELECT 
+        database_id, 
+        is_auto_cleanup_on,
+        retention_period,
+        retention_period_units_desc,
+        retention_period_units
+      FROM sys.change_tracking_databases
+    ",0,0,0,0x4601f19bdf4b594d,0x4ea077a919ad48df,1
+"
+      SELECT COUNT_BIG(*) AS NumOfNodes FROM [sys].[dm_hadr_cluster_members] WHERE member_type = 0
+    ",1,1,1,0xe38a92841c7505ca,0xd4a3754026c233d3,1
+"
+      SELECT quorum_type_desc FROM [sys].[dm_hadr_cluster]
+    ",0,0,0,0x62d49f7c5723b249,0xfcc20aab105c0d87,1
+"
+      SELECT pr.type PrincipalType,
+      pr.default_language_name DefaultLanguageName,
+      COUNT_BIG(DISTINCT pr.principal_id) PrincipalCount
+      FROM sys.server_principals AS pr   
+      GROUP BY  
+      pr.type, pr.default_language_name
+    ",0,6,6,0xc54ef99e278ba94c,0x1a8073b2d9c9ea46,1
+"
+      SELECT COUNT(*) as provider_count, provider FROM sys.servers WITH(nolock) WHERE is_linked=1 GROUP BY provider
+    ",0,0,0,0x10c79b062068276f,0x01bbaab2f07cf681,1
+"
+      SELECT top 1000 
+      group_id, replica_id, group_database_id,group_database_id, is_local, is_primary_replica, synchronization_state, is_commit_participant, synchronization_health, database_state, is_suspended
+      FROM sys.dm_hadr_database_replica_states WITH(nolock) 
+      where group_id in (select group_id from sys.dm_hadr_availability_replica_states WITH(nolock) where is_local = 1 and role = 1)
+    ",0,0,0,0x2dcc03153407a676,0x5ab55ed85bfaaf35,1
+"
+      select group_id, listener_id, LEN(ISNULL(dns_name,'')) AS dns_length, is_conformant
+      from sys.availability_group_listeners WITH(nolock)
+      where group_id in (select group_id from sys.dm_hadr_availability_replica_states WITH(nolock) where is_local = 1 and role = 1)
+    ",0,0,0,0x8f4d69e9e39b5073,0xdca4fd7d5252ef03,1
+"
+      select count(*) as AgsWithDtcSupportOn
+      from sys.availability_groups WITH(nolock) where dtc_support = 1 and group_id in
+      (select group_id from sys.dm_hadr_availability_replica_states WITH(nolock) where is_local = 1 and role = 1)
+    ",0,1,1,0xfceb14d5a4453f34,0x0b2e400c9be10c79,1
+"
+      SELECT 
+      host_platform,
+      host_distribution,
+      host_release,
+      host_service_pack_level,
+      host_sku,
+      os_language_version 
+      FROM sys.dm_os_host_info
+    ",0,1,1,0x43d3bdb6383766bc,0x4b1601c2e8424866,1
+"
+      SELECT state, current_size_in_kb FROM sys.dm_os_buffer_pool_extension_configuration WITH(nolock)
+    ",0,1,1,0x65f7d421db438c4d,0x9aea1f8b2d08f5c9,1
+"
+
+      /*The following query helps to understand how the Microsoft SQL Server Connector for Azure Key Vault (EKM Provider) is being used for those configuring Azure Key Vault for Transparent Data Encryption (TDE), Cell Level Encryption (CLE), and/or Backup encryption.
+      The count of cryptographic EKM providers and the version number of SQL Server Connector on the SQL Server instance are collected. For non-Microsoft EKM providers, no specific information other than the count of non-Microsoft providers is being queried.
+      Note: 'A16BA7DE-26E0-43C4-871C-4ED750C65597' is the provider guid for the Microsoft SQL Server Connector, and is used only to help identify its use by the instance.*/
+
+      SELECT
+      'Other' as ProviderType,
+      null as ProviderVersion,
+      count_big(*) as ProviderCount
+      FROM sys.dm_cryptographic_provider_properties
+      WHERE guid != 'A16BA7DE-26E0-43C4-871C-4ED750C65597'
+      UNION ALL
+      SELECT
+      'SQLServerConnector' as ProviderType,
+      provider_version as ProviderVersion,
+      1 as ProviderCount
+      FROM sys.dm_cryptographic_provider_properties
+      WHERE guid = 'A16BA7DE-26E0-43C4-871C-4ED750C65597'
+      ORDER BY ProviderType, ProviderVersion
+    ",0,1,1,0xc0b07adcfa91b5ac,0x02f8860b8ec4ecce,1
+"
+      select language, counter_name, counter_value from sys.dm_external_script_execution_stats
+    ",0,0,0,0xdf0264ceaf4dff0c,0x602797d1e1574d8a,1
+"
+      SELECT count_big(*) AS external_resource_pools from sys.resource_governor_external_resource_pools WHERE name != 'default'
+    ",0,1,1,0x5b96a1064fd7b72d,0x972781d7a494a3a4,1
+"
+      select counter_name, cntr_value from sys.dm_os_performance_counters where object_name like '%External Scripts%'
+    ",0,8,8,0xd63e40f84e4e2d17,0x5ed9cf073adb3b93,1
+"
+      select cntr_value as merge_policy_evaluation
+      from sys.dm_os_performance_counters WITH(nolock)
+      where
+      object_name like '%columnstore%' and
+      counter_name ='Total Merge Policy Evaluations' and
+      instance_name = '_Total'
+    ",0,1,1,0x422bce31569a5c0a,0x5ed9cf073adb3b93,1
+"
+      -- SQLXI datapoint - count of db files in XI path
+      SELECT COUNT_BIG(name) AS xi_db_file_count
+      FROM sys.master_files WITH(nolock)
+      WHERE credential_id IS NOT NULL
+      AND state = 0
+    ",0,1,1,0xde276055e5d37185,0x5796d365a6a65cbf,1
+"
+      SELECT
+      total_count,
+      rows_touched,
+      dependencies_taken,
+      dependencies_failed,
+      validation_failures
+      FROM sys.dm_xtp_transaction_stats WITH(nolock)
+    ",0,1,1,0x129c8f83c1469f1c,0x2e82763dabccdef7,1
+"
+      SELECT
+      ISNULL(sum(allocated_bytes)/1024,0) AS total_memory_allocated_for_system_kb
+      FROM sys.dm_xtp_system_memory_consumers WITH(nolock)
+    ",1,1,1,0xf9f8eb95175291ad,0x920ff227763e758d,1
+"
+      select 1 as name, -- Temp DB
+      case mf.type_desc
+      when 'ROWS' then 1
+      when 'LOG' then 2
+      end as 'type',
+      CAST(SUM(num_of_reads) as nvarchar(128)) as total_num_of_reads,
+      CAST(SUM(num_of_bytes_read) as nvarchar(128)) as total_num_of_bytes_read,
+      CAST(SUM(io_stall_read_ms) as nvarchar(128)) as total_io_stall_read_ms,
+      CAST(SUM(num_of_writes) as nvarchar(128)) as total_num_of_writes,
+      CAST(SUM(num_of_bytes_written) as nvarchar(128)) as total_num_of_bytes_written,
+      CAST(SUM(io_stall_write_ms) as nvarchar(128)) as total_io_stall_write_ms,
+      COUNT_BIG(*) as total
+      from sys.dm_io_virtual_file_stats(NULL, NULL) fs, sys.master_files mf
+      where fs.database_id = mf.database_id and fs.file_id = mf.file_id and fs.database_id = 2 and (fs.num_of_reads != 0 OR fs.num_of_writes != 0)
+      group by mf.name, mf.type, mf.type_desc
+
+      UNION ALL
+
+      select 2 as name, -- User DBs
+      case mf.type_desc
+      when 'ROWS' then 1
+      when 'LOG' then 2
+      end as 'type',
+      CAST(SUM(num_of_reads) as nvarchar(128)) as total_num_of_reads,
+      CAST(SUM(num_of_bytes_read) as nvarchar(128)) as total_num_of_bytes_read,
+      CAST(SUM(io_stall_read_ms) as nvarchar(128)) as total_io_stall_read_ms,
+      CAST(SUM(num_of_writes) as nvarchar(128)) as total_num_of_writes,
+      CAST(SUM(num_of_bytes_written) as nvarchar(128)) as total_num_of_bytes_written,
+      CAST(SUM(io_stall_write_ms) as nvarchar(128)) as total_io_stall_write_ms,
+      COUNT_BIG(*) as total
+      from sys.dm_io_virtual_file_stats(NULL, NULL) fs, sys.master_files mf
+      where fs.database_id = mf.database_id and fs.file_id = mf.file_id and fs.database_id > 4 and (fs.num_of_reads != 0 OR fs.num_of_writes != 0)
+      group by mf.type, mf.type_desc
+
+      UNION ALL
+
+      select 3 as name, -- System DBs
+      case mf.type_desc
+      when 'ROWS' then 1
+      when 'LOG' then 2
+      end as 'type',
+      CAST(SUM(num_of_reads) as nvarchar(128)) as total_num_of_reads,
+      CAST(SUM(num_of_bytes_read) as nvarchar(128)) as total_num_of_bytes_read,
+      CAST(SUM(io_stall_read_ms) as nvarchar(128)) as total_io_stall_read_ms,
+      CAST(SUM(num_of_writes) as nvarchar(128)) as total_num_of_writes,
+      CAST(SUM(num_of_bytes_written) as nvarchar(128)) as total_num_of_bytes_written,
+      CAST(SUM(io_stall_write_ms) as nvarchar(128)) as total_io_stall_write_ms,
+      COUNT_BIG(*) as total
+      from sys.dm_io_virtual_file_stats(NULL, NULL) fs, sys.master_files mf WITH(nolock)
+      where fs.database_id = mf.database_id and fs.file_id = mf.file_id and (fs.database_id = 1 OR fs.database_id = 3 OR fs.database_id = 4) and (fs.num_of_reads != 0 OR fs.num_of_writes != 0)
+      group by mf.type, mf.type_desc
+
+    ",2,4,4,0xd1de78aeef6f0c44,0x1e96b9d30a3d256a,1
+"
+      SELECT b1.device_type,
+      ISNULL(b1.[type],'NULL') AS backup_type,
+      b1.is_copy_only,
+      b1.time_bucket,
+      b1.compressed_backup_size_bucket,
+      b1.compression_percent_bucket,
+      b1.backup_throughput_bucket,
+      COUNT_BIG(b1.device_type) AS 'count',
+      b1.encryption
+      FROM
+      (
+      SELECT
+      mf.device_type,
+      bset.[type],
+      CAST(bset.[is_copy_only] AS INT) AS [is_copy_only],
+      CASE
+      WHEN DATEDIFF(SECOND, bset.[backup_start_date], bset.[backup_finish_date]) = 0                    THEN 0
+      WHEN DATEDIFF(SECOND, bset.[backup_start_date], bset.[backup_finish_date])      BETWEEN 1 AND 30       THEN 1
+      WHEN DATEDIFF(SECOND, bset.[backup_start_date], bset.[backup_finish_date])      BETWEEN 30 AND 60      THEN 2
+      WHEN DATEDIFF(MINUTE, bset.[backup_start_date], bset.[backup_finish_date])      BETWEEN 1 AND 5        THEN 3
+      WHEN DATEDIFF(MINUTE, bset.[backup_start_date], bset.[backup_finish_date])      BETWEEN 5 AND 10       THEN 4
+      WHEN DATEDIFF(MINUTE, bset.[backup_start_date], bset.[backup_finish_date])      BETWEEN 10 AND 30      THEN 5
+      WHEN DATEDIFF(MINUTE, bset.[backup_start_date], bset.[backup_finish_date])      BETWEEN 30 AND 60      THEN 6
+      WHEN DATEDIFF(HOUR, bset.[backup_start_date], bset.[backup_finish_date])        BETWEEN 1 AND 2        THEN 7
+      WHEN DATEDIFF(HOUR, bset.[backup_start_date], bset.[backup_finish_date])        BETWEEN 2 AND 6        THEN 8
+      WHEN DATEDIFF(HOUR, bset.[backup_start_date], bset.[backup_finish_date])        BETWEEN 6 AND 12       THEN 9
+      WHEN DATEDIFF(HOUR, bset.[backup_start_date], bset.[backup_finish_date])        BETWEEN 12 AND 24      THEN 10
+      ELSE 99
+      END
+      AS 'time_bucket',
+      CASE
+      WHEN CAST(ISNULL(bset.compressed_backup_size, 0) / 1048576 AS FLOAT) BETWEEN 0 AND 1          THEN 0
+      WHEN CAST(ISNULL(bset.compressed_backup_size, 0) / 1048576 AS FLOAT) BETWEEN 1 AND 5          THEN 1
+      WHEN CAST(ISNULL(bset.compressed_backup_size, 0) / 1048576 AS FLOAT) BETWEEN 5 AND 25         THEN 2
+      WHEN CAST(ISNULL(bset.compressed_backup_size, 0) / 1048576 AS FLOAT) BETWEEN 25 AND 100       THEN 3
+      WHEN CAST(ISNULL(bset.compressed_backup_size, 0) / 1048576 AS FLOAT) BETWEEN 100 AND 500      THEN 4
+      WHEN CAST(ISNULL(bset.compressed_backup_size, 0) / 1048576 AS FLOAT) BETWEEN 500 AND 1000     THEN 5
+      WHEN CAST(ISNULL(bset.compressed_backup_size, 0) / 1048576 AS FLOAT) BETWEEN 1000 AND 5000    THEN 6
+      WHEN CAST(ISNULL(bset.compressed_backup_size, 0) / 1048576 AS FLOAT) BETWEEN 5000 AND 10000   THEN 7
+      WHEN CAST(ISNULL(bset.compressed_backup_size, 0) / 1048576 AS FLOAT) BETWEEN 10000 AND 50000  THEN 8
+      WHEN CAST(ISNULL(bset.compressed_backup_size, 0) / 1048576 AS FLOAT) BETWEEN 50000 AND 100000 THEN 9
+      ELSE 99
+      END
+      AS compressed_backup_size_bucket,
+      CASE
+      WHEN CAST(((ISNULL(bset.backup_size,0) - ISNULL(bset.compressed_backup_size,0)) /
+      CASE WHEN bset.backup_size <= 0 THEN 1
+      ELSE ISNULL(bset.backup_size, 1)
+      END
+      ) * 100  AS FLOAT) = 0.0 THEN 0
+      ELSE (CAST(((ISNULL(bset.backup_size,0) - ISNULL(bset.compressed_backup_size,0)) /
+      CASE WHEN bset.backup_size <= 0 THEN 1
+      ELSE ISNULL(bset.backup_size, 1)
+      END
+      ) * 100  AS INT)/10) + 1
+      END
+      AS compression_percent_bucket,
+      CASE
+      WHEN CAST(CAST(ISNULL(bset.compressed_backup_size, 0) / 1024 AS FLOAT) / (CASE WHEN  DATEDIFF(SECOND, bset.[backup_start_date], bset.[backup_finish_date]) = 0 THEN 1 END) AS FLOAT) = 0.0                       THEN 0
+      WHEN CAST(CAST(ISNULL(bset.compressed_backup_size, 0) / 1024 AS FLOAT) / (CASE WHEN  DATEDIFF(SECOND, bset.[backup_start_date], bset.[backup_finish_date]) = 0 THEN 1 END) AS FLOAT) BETWEEN  0 AND 100          THEN 1
+      WHEN CAST(CAST(ISNULL(bset.compressed_backup_size, 0) / 1024 AS FLOAT) / (CASE WHEN  DATEDIFF(SECOND, bset.[backup_start_date], bset.[backup_finish_date]) = 0 THEN 1 END) AS FLOAT) BETWEEN  100 AND 500        THEN 2
+      WHEN CAST(CAST(ISNULL(bset.compressed_backup_size, 0) / 1024 AS FLOAT) / (CASE WHEN  DATEDIFF(SECOND, bset.[backup_start_date], bset.[backup_finish_date]) = 0 THEN 1 END) AS FLOAT) BETWEEN  500 AND 1000       THEN 3
+      WHEN CAST(CAST(ISNULL(bset.compressed_backup_size, 0) / 1024 AS FLOAT) / (CASE WHEN  DATEDIFF(SECOND, bset.[backup_start_date], bset.[backup_finish_date]) = 0 THEN 1 END) AS FLOAT) BETWEEN  1000 AND 5000      THEN 4
+      WHEN CAST(CAST(ISNULL(bset.compressed_backup_size, 0) / 1024 AS FLOAT) / (CASE WHEN  DATEDIFF(SECOND, bset.[backup_start_date], bset.[backup_finish_date]) = 0 THEN 1 END) AS FLOAT) BETWEEN  5000 AND 10000     THEN 5
+      WHEN CAST(CAST(ISNULL(bset.compressed_backup_size, 0) / 1024 AS FLOAT) / (CASE WHEN  DATEDIFF(SECOND, bset.[backup_start_date], bset.[backup_finish_date]) = 0 THEN 1 END) AS FLOAT) BETWEEN  10000 AND 20000    THEN 6
+      WHEN CAST(CAST(ISNULL(bset.compressed_backup_size, 0) / 1024 AS FLOAT) / (CASE WHEN  DATEDIFF(SECOND, bset.[backup_start_date], bset.[backup_finish_date]) = 0 THEN 1 END) AS FLOAT) BETWEEN  20000 AND 30000    THEN 7
+      WHEN CAST(CAST(ISNULL(bset.compressed_backup_size, 0) / 1024 AS FLOAT) / (CASE WHEN  DATEDIFF(SECOND, bset.[backup_start_date], bset.[backup_finish_date]) = 0 THEN 1 END) AS FLOAT) BETWEEN  30000 AND 50000    THEN 8
+      WHEN CAST(CAST(ISNULL(bset.compressed_backup_size, 0) / 1024 AS FLOAT) / (CASE WHEN  DATEDIFF(SECOND, bset.[backup_start_date], bset.[backup_finish_date]) = 0 THEN 1 END) AS FLOAT) BETWEEN  50000 AND 100000   THEN 9
+      WHEN CAST(CAST(ISNULL(bset.compressed_backup_size, 0) / 1024 AS FLOAT) / (CASE WHEN  DATEDIFF(SECOND, bset.[backup_start_date], bset.[backup_finish_date]) = 0 THEN 1 END) AS FLOAT) BETWEEN  100000 AND 500000  THEN 10
+      WHEN CAST(CAST(ISNULL(bset.compressed_backup_size, 0) / 1024 AS FLOAT) / (CASE WHEN  DATEDIFF(SECOND, bset.[backup_start_date], bset.[backup_finish_date]) = 0 THEN 1 END) AS FLOAT) BETWEEN  500000 AND 1000000 THEN 11
+      ELSE 99
+      END
+      AS backup_throughput_bucket, -- in KB
+      CASE
+      WHEN bset.encryptor_type like '%CERTIFICATE%' THEN 1
+      WHEN bset.encryptor_type like '%ASYMMETRIC KEY%' THEN 2
+      ELSE 0
+      END
+      AS encryption
+      FROM [msdb].[dbo].[backupset] bset WITH (READUNCOMMITTED)
+      JOIN [msdb].[dbo].[backupmediafamily]  mf WITH (READUNCOMMITTED) ON  mf.media_set_id = bset.media_set_id
+      WHERE
+      backup_finish_date <= GETDATE() and backup_finish_date > DATEADD(hh, -24, GETDATE() )
+      ) AS b1
+      GROUP BY
+      b1.device_type,
+      b1.[type],
+      b1.is_copy_only,
+      b1.time_bucket,
+      b1.compressed_backup_size_bucket,
+      b1.compression_percent_bucket,
+      b1.backup_throughput_bucket,
+      b1.encryption
+
+    ",1,0,0,0x42cea1862916040a,0x73a8e94088c89c4a,1
+"
+      select
+      group_id,
+      replica_id,
+      availability_mode,
+      failover_mode,
+      primary_role_allow_connections,
+      secondary_role_allow_connections,
+      LEN(ISNULL(read_only_routing_url, '')) as read_only_routing_url_length,
+      seeding_mode,
+      session_timeout
+      from sys.availability_replicas WITH(nolock) where group_id in
+      (select group_id from sys.dm_hadr_availability_replica_states WITH(nolock) where is_local = 1 and role = 1)
+    ",0,0,0,0xf94f43766d940238,0x895e8a627b7f72c2,1
+"
+      select
+      case
+      when (listener_id IS NOT NULL) then 1
+      else 0
+      end AS [listener_used]
+      from sys.availability_group_listeners WITH(nolock) where group_id in
+      (select group_id from sys.dm_hadr_availability_replica_states WITH(nolock) where is_local = 1 and role = 1)
+    ",0,0,0,0x69d44b067eb229a2,0xdca4fd7d5252ef03,1
+"
+      select
+      group_id,
+      automated_backup_preference AS [BackupPreference],
+      failure_condition_level,
+      health_check_timeout,
+      dtc_support,
+      db_failover,
+      is_distributed,
+      required_synchronized_secondaries_to_commit,
+      cluster_type,
+      sequence_number
+      from sys.availability_groups where group_id in
+      (select group_id from sys.dm_hadr_availability_replica_states WITH(nolock) where is_local = 1 and role = 1)
+    ",0,0,0,0x988284d0c2769d2c,0xa0a48ee2eb98874c,1
+"
+      select COUNT_BIG(*) AS [NumReplicaPerAG]
+      from sys.dm_hadr_availability_replica_states where group_id in
+      (select group_id from sys.dm_hadr_availability_replica_states WITH(nolock) where is_local = 1 and role = 1) group by group_id
+    ",0,0,0,0x0c25f4d76490927f,0x0ec8fa288a291abf,1
+"
+      select COUNT_BIG(*) AS [NumDBperAG] from sys.dm_hadr_database_replica_states where group_id in
+      (select group_id from sys.dm_hadr_availability_replica_states WITH(nolock) where is_local = 1 and role = 1) and is_local = 1 group by group_id
+    ",0,0,0,0x045890523035ca2f,0xa3f3bc31afc96605,1
+"
+      select COUNT_BIG(*) as [NumAGinServer] from sys.availability_groups WITH(nolock)
+    ",0,1,1,0xfbbe5324d91a9cb9,0x0e0b34cafdb9b945,1
+"
+      select COUNT_BIG(distinct audit_action_name) AS ServerAuditActionCount
+      from sys.server_audit_specification_details WITH(nolock)
+    ",0,1,1,0x1f462a4f5de873a7,0xf2be5e105b7d0f27,1
+"
+      select
+      type_desc,
+      on_failure_desc,
+      queue_delay,
+      is_state_enabled
+      from sys.server_audits WITH(nolock)
+    ",0,0,0,0x9fb42727d5f8980d,0x21d4d00da653e10c,1
+"
+      SELECT
+      cpu_count AS LogicalCPUCount,
+      hyperthread_ratio AS HyperthreadRatio,
+      physical_memory_kb/1024.0 AS PhysicalMemoryMB,
+      CONVERT(VARCHAR(20), sqlserver_start_time,  120) AS SQLServerStartTime,
+      affinity_type_desc AS AffinityTypeDesc,
+      virtual_machine_type AS VirtualMachineType,
+      socket_count as SocketCount,
+      cores_per_socket as CoresPerSocket,
+      numa_node_count as NumaNodeCount,
+      container_type as ContainerType,
+      container_type_desc as ContainerDescription
+      FROM sys.dm_os_sys_info WITH(nolock)
+    ",0,1,1,0x094611e18c2c8289,0xbc41c3737af663ea,1
+(@1 tinyint)SELECT COUNT_BIG(*) [number_of_forwarders] FROM [sys].[service_broker_endpoints] WITH(nolock)  WHERE [is_message_forwarding_enabled]=@1,0,1,1,0x2681bbb136affe95,0x7c579e92321daaf3,1
+"
+      SELECT COUNT_BIG(*) AS SBConnections FROM sys.dm_broker_connections WITH(nolock)
+    ",0,1,1,0xde62d3dda28f3725,0x8576389231848a66,1
+"
+      SELECT protocol AS [sProtocolId], COUNT_BIG(*) AS [sNumProtocols] FROM master.sys.endpoints WITH(nolock) GROUP BY protocol
+    ",0,4,4,0x7b270e5ba5a2358b,0x5c2b08850156cba0,1
+"
+      DECLARE @i bigint
+      SET @i = (SELECT CASE WHEN occurrence = 0 THEN NULL ELSE occurrence END FROM sys.dm_exec_query_optimizer_info WITH(nolock) WHERE counter = N'optimizations')
+
+      SELECT
+      MAX(CASE counter WHEN N'trivial plan' THEN CONVERT(INT, 100000000 * (occurrence * 1.0) / @i) END) AS [SqlQOFracTrivPlan],
+      MAX(CASE counter WHEN N'search 0' THEN CONVERT(INT, 100000000 * (occurrence * 1.0) / @i) END) AS [SqlQOFracSearch0],
+      MAX(CASE counter WHEN N'search 1' THEN CONVERT(INT, 100000000 * (occurrence * 1.0) / @i) END) AS [SqlQOFracSearch1],
+      MAX(CASE counter WHEN N'search 2' THEN CONVERT(INT, 100000000 * (occurrence * 1.0) / @i) END) AS [SqlQOFracSearch2],
+      MAX(CASE counter WHEN N'timeout' THEN CONVERT(INT, 100000000 * (occurrence * 1.0) / @i) END) AS [SqlQOFracTimeout],
+      MAX(CASE counter WHEN N'memory limit exceeded' THEN CONVERT(INT, 100000000 * (occurrence * 1.0) / @i) END) AS [SqlQOFracMemLimit],
+      MAX(CASE counter WHEN N'search 0 time' THEN CONVERT(INT, IsNull(value,0) * 10000) END) AS [SqlQOAvgSearch0time],
+      MAX(CASE counter WHEN N'search 1 time' THEN CONVERT(INT, IsNull(value,0) * 10000) END) AS [SqlQOAvgSearch1time],
+      MAX(CASE counter WHEN N'search 2 time' THEN CONVERT(INT, IsNull(value,0) * 10000) END) AS [SqlQOAvgSearch2time],
+      MAX(CASE counter WHEN N'search 0 tasks' THEN CONVERT(INT, IsNull(value,0)) END) AS [SqlQOAvgSearch0tasks],
+      MAX(CASE counter WHEN N'search 1 tasks' THEN CONVERT(INT, IsNull(value,0)) END) AS [SqlQOAvgSearch1tasks],
+      MAX(CASE counter WHEN N'search 2 tasks' THEN CONVERT(INT, IsNull(value,0)) END) AS [SqlQOAvgSearch2tasks],
+      MAX(CASE counter WHEN N'gain stage 0 to stage 1' THEN CONVERT(INT, IsNull(value,0) * 1000) END) AS [SqlQOAvgStage1gain],
+      MAX(CASE counter WHEN N'gain stage 1 to stage 2' THEN CONVERT(INT, IsNull(value,0) * 1000) END) AS [SqlQOAvgStage2gain]
+      FROM sys.dm_exec_query_optimizer_info WITH(nolock)
+    ",0,1,1,0x899a4d1b514b19dd,0x5a93cb5c2aac9733,1
+"
+      DECLARE @i bigint
+      SET @i = (SELECT CASE WHEN occurrence = 0 THEN NULL ELSE occurrence END FROM sys.dm_exec_query_optimizer_info WITH(nolock) WHERE counter = N'optimizations')
+
+      SELECT
+      MAX(CASE counter WHEN N'trivial plan' THEN CONVERT(INT, 100000000 * (occurrence * 1.0) / @i) END) AS [SqlQOFracTrivPlan],
+      MAX(CASE counter WHEN N'search 0' THEN CONVERT(INT, 100000000 * (occurrence * 1.0) / @i) END) AS [SqlQOFracSearch0],
+      MAX(CASE counter WHEN N'search 1' THEN CONVERT(INT, 100000000 * (occurrence * 1.0) / @i) END) AS [SqlQOFracSearch1],
+      MAX(CASE counter WHEN N'search 2' THEN CONVERT(INT, 100000000 * (occurrence * 1.0) / @i) END) AS [SqlQOFracSearch2],
+      MAX(CASE counter WHEN N'timeout' THEN CONVERT(INT, 100000000 * (occurrence * 1.0) / @i) END) AS [SqlQOFracTimeout],
+      MAX(CASE counter WHEN N'memory limit exceeded' THEN CONVERT(INT, 100000000 * (occurrence * 1.0) / @i) END) AS [SqlQOFracMemLimit],
+      MAX(CASE counter WHEN N'search 0 time' THEN CONVERT(INT, IsNull(value,0) * 10000) END) AS [SqlQOAvgSearch0time],
+      MAX(CASE counter WHEN N'search 1 time' THEN CONVERT(INT, IsNull(value,0) * 10000) END) AS [SqlQOAvgSearch1time],
+      MAX(CASE counter WHEN N'search 2 time' THEN CONVERT(INT, IsNull(value,0) * 10000) END) AS [SqlQOAvgSearch2time],
+      MAX(CASE counter WHEN N'search 0 tasks' THEN CONVERT(INT, IsNull(value,0)) END) AS [SqlQOAvgSearch0tasks],
+      MAX(CASE counter WHEN N'search 1 tasks' THEN CONVERT(INT, IsNull(value,0)) END) AS [SqlQOAvgSearch1tasks],
+      MAX(CASE counter WHEN N'search 2 tasks' THEN CONVERT(INT, IsNull(value,0)) END) AS [SqlQOAvgSearch2tasks],
+      MAX(CASE counter WHEN N'gain stage 0 to stage 1' THEN CONVERT(INT, IsNull(value,0) * 1000) END) AS [SqlQOAvgStage1gain],
+      MAX(CASE counter WHEN N'gain stage 1 to stage 2' THEN CONVERT(INT, IsNull(value,0) * 1000) END) AS [SqlQOAvgStage2gain]
+      FROM sys.dm_exec_query_optimizer_info WITH(nolock)
+    ",0,1,1,0x667b4fb932574fe7,0x834757cbd2e8d0c8,1
+"
+      -- In the following query, the corresponding database ID, symmetric database encryption key algorithm, TDE state, and database encryption key encryptor type are collected.
+      SELECT database_id, key_algorithm, key_length, encryption_state, encryptor_type, COUNT_BIG(*) AS key_count FROM sys.dm_database_encryption_keys WITH(nolock) GROUP BY database_id, key_algorithm, key_length, encryption_state, encryptor_type
+    ",1,0,0,0x2e646b4e8f702c04,0xc722bf6770414f23,1
+"
+      --In the following query, the certificate certificate key length, and the certificate encryption type for TDE are collected.
+      SELECT key_length, pvt_key_encryption_type, COUNT_BIG(*) AS cert_count FROM sys.certificates WITH(nolock) GROUP BY key_length, pvt_key_encryption_type
+    ",0,1,1,0x9c62c4b2dbee5955,0x6da42823d7c06d93,1
+"
+      -- In the following query, the EKM provider type (cryptographic provider or not) and the asymmetric key algorithm for TDE are collected.
+      SELECT provider_type, algorithm_desc, COUNT_BIG(*) AS key_count FROM sys.asymmetric_keys WITH(nolock) GROUP BY provider_type, algorithm_desc
+    ",1,0,0,0x7dcf1c2bafc25ac9,0xd66f913d53abca37,1
+select COUNT_BIG(*) AS ReadOnlyRoutingRuleCount from sys.availability_read_only_routing_lists WITH(nolock),1,1,1,0x83ed7c0fc9b1aee1,0xe65ea6ab8ac89e50,1
+"SELECT database_id, type, SUM(CAST(size AS BIGINT))*8 as DatabaseSize FROM sys.master_files WITH(nolock) GROUP BY database_id, type",0,10,10,0xda4e5a2433d79e14,0xb35f818ce5c61f37,1
+"
+      SELECT COUNT_BIG(*) AS TempDbDataFileCount FROM sys.master_files WITH(nolock) WHERE database_id = 2 AND [type] = 0
+    ",0,1,1,0xca5eb8d9fda631d5,0x21dbf419dcbb82a8,1
+"
+      SELECT
+      database_id,
+      source_database_id AS SDID,
+      create_date,
+      compatibility_level,
+      user_access,
+      is_read_only,
+      is_auto_close_on,
+      is_auto_shrink_on,
+      state,
+      is_in_standby,
+      is_cleanly_shutdown,
+      is_supplemental_logging_enabled AS SLE,
+      recovery_model,
+      page_verify_option,
+      is_auto_create_stats_on AS ACS,
+      is_auto_create_stats_incremental_on AS ACSI,
+      is_auto_update_stats_on AS AUS,
+      is_auto_update_stats_async_on AUSA,
+      is_fulltext_enabled AS FTE,
+      is_trustworthy_on AS TW,
+      is_db_chaining_on AS DBC,
+      is_parameterization_forced AS PF,
+      is_master_key_encrypted_by_server AS MKEBS,
+      is_query_store_on AS QS,
+      is_published AS TREPL,
+      is_merge_published AS MREPL,
+      is_distributor,
+      is_sync_with_backup AS SWB,
+      is_broker_enabled AS BE,
+      log_reuse_wait,
+      is_cdc_enabled AS CDC,
+      is_encrypted,
+      is_honor_broker_priority_on AS HBP,
+      replica_id AS RID,
+      group_database_id AS GDID,
+      resource_pool_id AS RPID,
+      containment,
+      target_recovery_time_in_seconds AS TRT,
+      delayed_durability,
+      is_memory_optimized_elevate_to_snapshot_on AS MOES,
+      is_remote_data_archive_enabled AS RDAE,
+      collation_name AS DBCollation
+      FROM sys.databases WITH(nolock)
+    ",0,5,5,0xc3a4da2d4696f68c,0x5f1dbdf7dae76f0a,1
+"
+      SELECT cntr_value AS SqlServerMemory FROM sys.dm_os_performance_counters WITH(nolock) WHERE object_name = 'SQLServer:Memory Manager' AND counter_name = 'Total Server Memory (KB)'
+    ",1,0,0,0x32cbe473e62c6aaf,0xefc31e1336738e06,1
+"
+      SELECT replica_id, group_id, is_local, role, operational_state, recovery_health, synchronization_health, connected_state, last_connect_error_number, last_connect_error_timestamp FROM sys.dm_hadr_availability_replica_states WITH(nolock)
+    ",0,0,0,0x596dc82ecb751569,0xbdc86c19b0ed0968,1
+"
+      Select
+      operation_type,
+      total_operation_count
+      from sys.dm_column_encryption_enclave_operation_stats WITH(nolock)
+    ",0,0,0,0x10d044e185f216af,0x5a70b9afb63f5e3f,1
+"
+      Select
+      current_enclave_session_count,
+      current_column_encryption_key_count,
+      current_memory_size_kb,
+      total_evicted_session_count
+      from sys.dm_column_encryption_enclave WITH(nolock)
+    ",1,0,0,0xadffde7744e4a306,0x4ed4338545b80d2f,1
+"
+      SELECT
+      value_name,
+      value_data
+      FROM sys.dm_server_registry WITH(nolock)
+      WHERE value_name = 'InstallId'
+      OR (registry_key LIKE '%Polybase%' AND value_name = 'ScaleOutReady')
+    ",0,1,1,0x6c27e18ee09e39d8,0xc6eddeb03bb39574,1
+"
+      SELECT startup_type, status
+      FROM sys.dm_server_services WITH(nolock)
+      WHERE servicename LIKE 'SQL Server Agent (%'
+    ",1,1,1,0x5f24c196a601552f,0x7c553c7f3a189f22,1
+"
+      SELECT database_id, database_guid,
+      CASE
+      WHEN db_name(database_id) LIKE '%WideWorldImportersDW%' THEN 'WideWorldImportersDW'
+      WHEN db_name(database_id) LIKE '%WideWorldImporters%' THEN 'WideWorldImporters'
+      WHEN db_name(database_id) LIKE '%AdventureWorks2016CTP3%' THEN 'AdventureWorks2016CTP3'
+      WHEN db_name(database_id) LIKE '%AdventureWorksDW2016CTP3%' THEN 'AdventureWorksDW2016CTP3'
+      WHEN db_name(database_id) LIKE '%AdventureWorks2014%' THEN 'AdventureWorks2014'
+      WHEN db_name(database_id) LIKE '%AdventureWorksDW2014%' THEN 'AdventureWorksDW2014'
+      WHEN db_name(database_id) LIKE '%AdventureWorks2012%' THEN 'AdventureWorks2012'
+      WHEN db_name(database_id) LIKE '%AdventureWorksDW2012%' THEN 'AdventureWorksDW2012'
+      WHEN db_name(database_id) LIKE '%AdventureWorks2008%' THEN 'AdventureWorks2008'
+      WHEN db_name(database_id) LIKE '%AdventureWorksDW2008%' THEN 'AdventureWorksDW2008'
+      WHEN db_name(database_id) LIKE '%AdventureWorksDW%' THEN 'AdventureWorksDW'
+      WHEN db_name(database_id) LIKE '%AdventureWorks%' THEN 'AdventureWorks'
+      WHEN db_name(database_id) LIKE '%ReportServerTempDB%' THEN 'ReportServerTempDB'
+      WHEN db_name(database_id) LIKE '%ReportServer%' THEN 'ReportServer'
+      WHEN db_name(database_id) LIKE '%WSS_Content%' THEN 'WSS_Content'
+      WHEN db_name(database_id) LIKE '%MDW%' THEN 'MDW'
+      WHEN db_name(database_id) LIKE '%MicrosoftDynamicsAX_baseline%' THEN 'MicrosoftDynamicsAX_baseline'
+      WHEN db_name(database_id) LIKE '%MicrosoftDynamicsAX%' THEN 'MicrosoftDynamicsAX'
+      WHEN db_name(database_id) = 'master' THEN 'master'
+      WHEN db_name(database_id) = 'msdb' THEN 'msdb'
+      WHEN db_name(database_id) = 'tempdb' THEN 'tempdb'
+      WHEN db_name(database_id) = 'model' THEN 'model'
+      WHEN db_name(database_id) LIKE '%SharePoint_Config%' THEN 'SharePoint_Config'
+      WHEN db_name(database_id) LIKE '%SharePoint_AdminContent%' THEN 'SharePoint_AdminContent'
+      WHEN db_name(database_id) LIKE '%AppManagement%' THEN 'AppManagement'
+      WHEN db_name(database_id) LIKE '%Bdc_Service_DB%' THEN 'Bdc_Service_DB'
+      WHEN db_name(database_id) LIKE '%Search_Service_Application_DB%' THEN 'Search_Service_Application_DB'
+      WHEN db_name(database_id) LIKE '%Search_Service_Application_AnalyticsReportingStoreDB%' THEN 'Search_Service_Application_AnalyticsReportingStoreDB'
+      WHEN db_name(database_id) LIKE '%Search_Service_Application_CrawlStoreDB%' THEN 'Search_Service_Application_CrawlStoreDB'
+      WHEN db_name(database_id) LIKE '%Search_Service_Application_LinkStoreDB%' THEN 'Search_Service_Application_LinkStoreDB'
+      WHEN db_name(database_id) LIKE '%Secure_Store_Service_DB%' THEN 'Secure_Store_Service_DB'
+      WHEN db_name(database_id) LIKE '%SharePoint_Logging%' THEN 'SharePoint_Logging'
+      WHEN db_name(database_id) LIKE '%SettingsServiceDB%' THEN 'SettingsServiceDB'
+      WHEN db_name(database_id) LIKE '%User Profile Service Application_ProfileDB%' THEN 'User Profile Service Application_ProfileDB'
+      WHEN db_name(database_id) LIKE '%User Profile Service Application_SyncDB%' THEN 'User Profile Service Application_SyncDB'
+      WHEN db_name(database_id) LIKE '%User Profile Service Application_SocialDB%' THEN 'User Profile Service Application_SocialDB'
+      WHEN db_name(database_id) LIKE '%WordAutomationServices%' THEN 'WordAutomationServices'
+      WHEN db_name(database_id) LIKE '%Managed Metadata Service Application_Metadata%' THEN 'Managed Metadata Service Application_Metadata'
+      WHEN db_name(database_id) LIKE '%SharePoint Translation Services%' THEN 'SharePoint Translation Services'
+      WHEN db_name(database_id) LIKE '%ProjectWebApp%' THEN 'ProjectWebApp'
+      WHEN db_name(database_id) LIKE '%DefaultPowerPivotServiceApplicationDB%' THEN 'DefaultPowerPivotServiceApplicationDB'
+      WHEN db_name(database_id) LIKE '%PerformancePoint Service%' THEN 'PerformancePoint Service'
+      WHEN db_name(database_id) LIKE '%SessionStateService%' THEN 'SessionStateService'
+      WHEN db_name(database_id) = 'SSISDB' THEN 'SSISDB'
+      WHEN db_name(database_id) = 'DQS_MAIN' THEN 'DQS_MAIN'
+      ELSE 'Other'
+      END AS default_database_class
+      FROM sys.database_recovery_status WITH(nolock)
+    ",60,5,5,0x55601a1ce084ce79,0x5fb6b59e4f7ccb63,1
+"
+      DECLARE @ConfigDefault TABLE (
+      Name NVARCHAR(35) PRIMARY KEY,
+      DefaultValue SQL_VARIANT
+      );
+
+INSERT INTO @ConfigDefault (Name, DefaultValue)
+VALUES ('access check cache bucket count', 0)
+    ,('access check cache quota', 0)
+    ,('Ad Hoc Distributed Queries', 0)
+    ,('affinity I/O mask', 0)
+    ,('affinity mask', 0)
+    ,('affinity64 I/O mask', 0)
+    ,('affinity64 mask', 0)
+    ,('Agent XPs', 0)
+    ,('allow filesystem enumeration', 1)
+    ,('allow polybase export', 0)
+    ,('allow updates', 0)
+    ,('automatic soft-NUMA disabled', 0)
+    ,('backup checksum default', 0)
+    ,('backup compression default', 0)
+    ,('blocked process threshold (s)', 0)
+    ,('c2 audit mode', 0)
+    ,('clr enabled', 0)
+    ,('clr strict security', 1)
+    ,('column encryption enclave type', 0)
+    ,('common criteria compliance enabled', 0)
+    ,('contained database authentication', 0)
+    ,('cost threshold for parallelism', 5)
+    ,('cross db ownership chaining', 0)
+    ,('cursor threshold', -1)
+    ,('Database Mail XPs', 0)
+    ,('default full-text language', 1033)
+    ,('default language', 0)
+    ,('default trace enabled', 1)
+    ,('disallow results from triggers', 0)
+    ,('EKM provider enabled', 0)
+    ,('external scripts enabled', 0)
+    ,('filestream access level', 0)
+    ,('fill factor (%)', 0)
+    ,('ft crawl bandwidth (max)', 100)
+    ,('ft crawl bandwidth (min)', 0)
+    ,('ft notify bandwidth (max)', 100)
+    ,('ft notify bandwidth (min)', 0)
+    ,('hadoop connectivity', 0)
+    ,('index create memory (KB)', 0)
+    ,('in-doubt xact resolution', 0)
+    ,('lightweight pooling', 0)
+    ,('locks', 0)
+    ,('max degree of parallelism', 0)
+    ,('max full-text crawl range', 4)
+    ,('max server memory (MB)', 2147483647)
+    ,('max text repl size (B)', 65536)
+    ,('max worker threads', 0)
+    ,('media retention', 0)
+    ,('min memory per query (KB)', 1024)
+    ,('min server memory (MB)', 0)
+    ,('nested triggers', 1)
+    ,('network packet size (B)', 4096)
+    ,('Ole Automation Procedures', 0)
+    ,('open objects', 0)
+    ,('optimize for ad hoc workloads', 0)
+    ,('PH timeout (s)', 60)
+    ,('polybase enabled', 0)
+    ,('polybase network encryption', 1)
+    ,('precompute rank', 0)
+    ,('priority boost', 0)
+    ,('query governor cost limit', 0)
+    ,('query wait (s)', -1)
+    ,('recovery interval (min)', 0)
+    ,('remote access', 1)
+    ,('remote admin connections', 0)
+    ,('remote data archive', 0)
+    ,('remote login timeout (s)', 10)
+    ,('remote proc trans', 0)
+    ,('remote query timeout (s)', 600)
+    ,('Replication XPs', 0)
+    ,('scan for startup procs', 0)
+    ,('server trigger recursion', 1)
+    ,('set working set size', 0)
+    ,('show advanced options', 0)
+    ,('SMO and DMO XPs', 1)
+    ,('tempdb metadata memory-optimized', 0)
+    ,('transform noise words', 0)
+    ,('two digit year cutoff', 2049)
+    ,('user connections', 0)
+    ,('user options', 0)
+    ,('xp_cmdshell', 0);
+
+SELECT
+      c.name ConfigName,
+      c.value ValueSet,
+      c.value_in_use ValueInUse,
+      d.DefaultValue DefaultValue
+FROM sys.configurations c WITH(nolock)
+      INNER JOIN @ConfigDefault d ON c.name = d.Name
+WHERE
+      c.value != c.value_in_use
+      OR c.value_in_use != d.DefaultValue;
+    ",0,81,81,0xb01dc7c1b69b21be,0x2b7ff8ea41919a2a,1
+"
+      DECLARE @ConfigDefault TABLE (
+      Name NVARCHAR(35) PRIMARY KEY,
+      DefaultValue SQL_VARIANT
+      );
+
+INSERT INTO @ConfigDefault (Name, DefaultValue)
+VALUES ('access check cache bucket count', 0)
+    ,('access check cache quota', 0)
+    ,('Ad Hoc Distributed Queries', 0)
+    ,('affinity I/O mask', 0)
+    ,('affinity mask', 0)
+    ,('affinity64 I/O mask', 0)
+    ,('affinity64 mask', 0)
+    ,('Agent XPs', 0)
+    ,('allow filesystem enumeration', 1)
+    ,('allow polybase export', 0)
+    ,('allow updates', 0)
+    ,('automatic soft-NUMA disabled', 0)
+    ,('backup checksum default', 0)
+    ,('backup compression default', 0)
+    ,('blocked process threshold (s)', 0)
+    ,('c2 audit mode', 0)
+    ,('clr enabled', 0)
+    ,('clr strict security', 1)
+    ,('column encryption enclave type', 0)
+    ,('common criteria compliance enabled', 0)
+    ,('contained database authentication', 0)
+    ,('cost threshold for parallelism', 5)
+    ,('cross db ownership chaining', 0)
+    ,('cursor threshold', -1)
+    ,('Database Mail XPs', 0)
+    ,('default full-text language', 1033)
+    ,('default language', 0)
+    ,('default trace enabled', 1)
+    ,('disallow results from triggers', 0)
+    ,('EKM provider enabled', 0)
+    ,('external scripts enabled', 0)
+    ,('filestream access level', 0)
+    ,('fill factor (%)', 0)
+    ,('ft crawl bandwidth (max)', 100)
+    ,('ft crawl bandwidth (min)', 0)
+    ,('ft notify bandwidth (max)', 100)
+    ,('ft notify bandwidth (min)', 0)
+    ,('hadoop connectivity', 0)
+    ,('index create memory (KB)', 0)
+    ,('in-doubt xact resolution', 0)
+    ,('lightweight pooling', 0)
+    ,('locks', 0)
+    ,('max degree of parallelism', 0)
+    ,('max full-text crawl range', 4)
+    ,('max server memory (MB)', 2147483647)
+    ,('max text repl size (B)', 65536)
+    ,('max worker threads', 0)
+    ,('media retention', 0)
+    ,('min memory per query (KB)', 1024)
+    ,('min server memory (MB)', 0)
+    ,('nested triggers', 1)
+    ,('network packet size (B)', 4096)
+    ,('Ole Automation Procedures', 0)
+    ,('open objects', 0)
+    ,('optimize for ad hoc workloads', 0)
+    ,('PH timeout (s)', 60)
+    ,('polybase enabled', 0)
+    ,('polybase network encryption', 1)
+    ,('precompute rank', 0)
+    ,('priority boost', 0)
+    ,('query governor cost limit', 0)
+    ,('query wait (s)', -1)
+    ,('recovery interval (min)', 0)
+    ,('remote access', 1)
+    ,('remote admin connections', 0)
+    ,('remote data archive', 0)
+    ,('remote login timeout (s)', 10)
+    ,('remote proc trans', 0)
+    ,('remote query timeout (s)', 600)
+    ,('Replication XPs', 0)
+    ,('scan for startup procs', 0)
+    ,('server trigger recursion', 1)
+    ,('set working set size', 0)
+    ,('show advanced options', 0)
+    ,('SMO and DMO XPs', 1)
+    ,('tempdb metadata memory-optimized', 0)
+    ,('transform noise words', 0)
+    ,('two digit year cutoff', 2049)
+    ,('user connections', 0)
+    ,('user options', 0)
+    ,('xp_cmdshell', 0);
+
+SELECT
+      c.name ConfigName,
+      c.value ValueSet,
+      c.value_in_use ValueInUse,
+      d.DefaultValue DefaultValue
+FROM sys.configurations c WITH(nolock)
+      INNER JOIN @ConfigDefault d ON c.name = d.Name
+WHERE
+      c.value != c.value_in_use
+      OR c.value_in_use != d.DefaultValue;
+    ",1,1,1,0x95144f3bebf0f28d,0x7f146232940d5910,1
+"(@1 varchar(8000))SELECT [name],[value] FROM [sys].[extended_properties] WHERE [name]=@1",4,0,0,0x2ba81dfa5d42da17,0xd119e51f5b7ada44,1
+"SELECT
+dtb.name AS [Name],
+dtb.database_id AS [ID],
+CAST(has_dbaccess(dtb.name) AS bit) AS [IsAccessible]
+FROM
+master.sys.databases AS dtb
+ORDER BY
+[Name] ASC",60,5,5,0xd778a415c3f6b4af,0x84f314f5a1b3c4bf,1
+"(@_msparam_0 nvarchar(4000))SELECT
+dtb.collation_name AS [Collation],
+dtb.name AS [DatabaseName2]
+FROM
+master.sys.databases AS dtb
+WHERE
+(dtb.name=@_msparam_0)",0,1,1,0xcd9b9447755495dc,0xbdd855556de12cef,1
+"  DECLARE @query_plan_hash VARBINARY(8) = 0xB0C169573ABB1EE2;
+
+  
+  SELECT
+    text, total_num_physical_reads, min_rows, max_rows, query_hash, query_plan_hash, execution_count
+    FROM 
+      sys.dm_exec_query_stats AS deqs
+      CROSS APPLY sys.dm_exec_sql_text(deqs.sql_handle) AS dest
+	where query_plan_hash = @query_plan_hash
+    ORDER BY 
+      deqs.last_execution_time DESC",0,1,1,0xc81eeaa288cb3239,0x55a7dec159f152d3,1
+"    SELECT
+    text, total_num_physical_reads, min_rows, max_rows, query_hash, query_plan_hash, execution_count
+    FROM 
+      sys.dm_exec_query_stats AS deqs
+      CROSS APPLY sys.dm_exec_sql_text(deqs.sql_handle) AS dest
+	where query_plan_hash = CONVERT(Varbinary(8),'0xB0C169573ABB1EE2')
+    ORDER BY 
+      deqs.last_execution_time DESC",0,0,0,0xc81eeaa288cb3239,0x55a7dec159f152d3,1
+"(@_msparam_0 nvarchar(4000))SELECT
+'' AS [DefaultSchema],
+dtb.name AS [DatabaseName]
+FROM
+master.sys.databases AS dtb
+WHERE
+(dtb.name=@_msparam_0)",0,1,1,0x794df56da881b45e,0xbdd855556de12cef,1
+"(@_msparam_0 nvarchar(4000))SELECT
+dtb.containment AS [ContainmentType],
+dtb.catalog_collation_type AS [CatalogCollation]
+FROM
+master.sys.databases AS dtb
+WHERE
+(dtb.name=@_msparam_0)",0,1,1,0x247955a5e73af07d,0x86ab1dd1f0089e39,1
+"    SELECT
+    text, total_num_physical_reads, min_rows, max_rows, query_hash, query_plan_hash, execution_count
+    FROM 
+      sys.dm_exec_query_stats AS deqs
+      CROSS APPLY sys.dm_exec_sql_text(deqs.sql_handle) AS dest
+	where query_plan_hash = '0xB0C169573ABB1EE2'
+    ORDER BY 
+      deqs.last_execution_time DESC",0,0,0,0xc81eeaa288cb3239,0x55a7dec159f152d3,1
+"    SELECT
+    text, total_num_physical_reads, min_rows, max_rows, query_hash, query_plan_hash, execution_count
+    FROM 
+      sys.dm_exec_query_stats AS deqs
+      CROSS APPLY sys.dm_exec_sql_text(deqs.sql_handle) AS dest
+
+    ORDER BY 
+      deqs.last_execution_time DESC",0,166,166,0x7ea492652c93f36f,0x77cdeba7e046f066,1
+"    SELECT
+    text, total_num_physical_reads, min_rows, max_rows, query_hash, query_plan_hash, execution_count
+    FROM 
+      sys.dm_exec_query_stats AS deqs
+      CROSS APPLY sys.dm_exec_sql_text(deqs.sql_handle) AS dest
+	  where query_plan_hash = '0xb0c169573abb1ee2'
+    ORDER BY 
+      deqs.last_execution_time DESC",0,0,0,0xc81eeaa288cb3239,0x55a7dec159f152d3,1
+"(@_msparam_0 nvarchar(4000),@_msparam_1 nvarchar(4000))SELECT
+clmns.column_id AS [ID],
+clmns.name AS [Name],
+ISNULL(dc.Name, N'') AS [DefaultConstraintName],
+clmns.is_nullable AS [Nullable],
+CAST(ISNULL(cik.index_column_id, 0) AS bit) AS [InPrimaryKey],
+clmns.is_identity AS [Identity],
+usrt.name AS [DataType],
+ISNULL(baset.name, N'') AS [SystemType],
+CAST(CASE WHEN baset.name IN (N'nchar', N'nvarchar') AND clmns.max_length <> -1 THEN clmns.max_length/2 ELSE clmns.max_length END AS int) AS [Length],
+CAST(clmns.precision AS int) AS [NumericPrecision],
+CAST(clmns.scale AS int) AS [NumericScale],
+ISNULL(xscclmns.name, N'') AS [XmlSchemaNamespace],
+ISNULL(s2clmns.name, N'') AS [XmlSchemaNamespaceSchema],
+ISNULL( (case clmns.is_xml_document when 1 then 2 else 1 end), 0) AS [XmlDocumentConstraint],
+s1clmns.name AS [DataTypeSchema],
+clmns.is_computed AS [Computed]
+FROM
+sys.all_objects AS udf
+INNER JOIN sys.all_columns AS clmns ON clmns.object_id=udf.object_id
+LEFT OUTER JOIN sys.default_constraints as dc ON clmns.default_object_id = dc.object_id
+LEFT OUTER JOIN sys.indexes AS ik ON ik.object_id = clmns.object_id and 1=ik.is_primary_key
+LEFT OUTER JOIN sys.index_columns AS cik ON cik.index_id = ik.index_id and cik.column_id = clmns.column_id and cik.object_id = clmns.object_id and 0 = cik.is_included_column
+LEFT OUTER JOIN sys.types AS usrt ON usrt.user_type_id = clmns.user_type_id
+LEFT OUTER JOIN sys.types AS baset ON (baset.user_type_id = clmns.system_type_id and baset.user_type_id = baset.system_type_id) or ((baset.system_type_id = clmns.system_type_id) and (baset.user_type_id = clmns.user_type_id) and (baset.is_user_defined = 0) and (baset.is_assembly_type = 1)) 
+LEFT OUTER JOIN sys.xml_schema_collections AS xscclmns ON xscclmns.xml_collection_id = clmns.xml_collection_id
+LEFT OUTER JOIN sys.schemas AS s2clmns ON s2clmns.schema_id = xscclmns.schema_id
+LEFT OUTER JOIN sys.schemas AS s1clmns ON s1clmns.schema_id = usrt.schema_id
+WHERE
+(udf.type in ('TF', 'FN', 'IF', 'FS', 'FT'))and(udf.name=@_msparam_0 and SCHEMA_NAME(udf.schema_id)=@_msparam_1)
+ORDER BY
+[ID] ASC",0,5,5,0x42ff243b761a00af,0x934b7c4b3704071e,1
+"(@_msparam_0 nvarchar(4000),@_msparam_1 nvarchar(4000),@_msparam_2 nvarchar(4000))SELECT
+clmns.column_id AS [ID],
+clmns.name AS [Name],
+ISNULL(dc.Name, N'') AS [DefaultConstraintName],
+clmns.is_nullable AS [Nullable],
+CAST(ISNULL(cik.index_column_id, 0) AS bit) AS [InPrimaryKey],
+clmns.is_identity AS [Identity],
+usrt.name AS [DataType],
+ISNULL(baset.name, N'') AS [SystemType],
+CAST(CASE WHEN baset.name IN (N'nchar', N'nvarchar') AND clmns.max_length <> -1 THEN clmns.max_length/2 ELSE clmns.max_length END AS int) AS [Length],
+CAST(clmns.precision AS int) AS [NumericPrecision],
+CAST(clmns.scale AS int) AS [NumericScale],
+ISNULL(xscclmns.name, N'') AS [XmlSchemaNamespace],
+ISNULL(s2clmns.name, N'') AS [XmlSchemaNamespaceSchema],
+ISNULL( (case clmns.is_xml_document when 1 then 2 else 1 end), 0) AS [XmlDocumentConstraint],
+s1clmns.name AS [DataTypeSchema],
+clmns.is_computed AS [Computed]
+FROM
+sys.all_views AS v
+INNER JOIN sys.all_columns AS clmns ON clmns.object_id=v.object_id
+LEFT OUTER JOIN sys.default_constraints as dc ON clmns.default_object_id = dc.object_id
+LEFT OUTER JOIN sys.indexes AS ik ON ik.object_id = clmns.object_id and 1=ik.is_primary_key
+LEFT OUTER JOIN sys.index_columns AS cik ON cik.index_id = ik.index_id and cik.column_id = clmns.column_id and cik.object_id = clmns.object_id and 0 = cik.is_included_column
+LEFT OUTER JOIN sys.types AS usrt ON usrt.user_type_id = clmns.user_type_id
+LEFT OUTER JOIN sys.types AS baset ON (baset.user_type_id = clmns.system_type_id and baset.user_type_id = baset.system_type_id) or ((baset.system_type_id = clmns.system_type_id) and (baset.user_type_id = clmns.user_type_id) and (baset.is_user_defined = 0) and (baset.is_assembly_type = 1)) 
+LEFT OUTER JOIN sys.xml_schema_collections AS xscclmns ON xscclmns.xml_collection_id = clmns.xml_collection_id
+LEFT OUTER JOIN sys.schemas AS s2clmns ON s2clmns.schema_id = xscclmns.schema_id
+LEFT OUTER JOIN sys.schemas AS s1clmns ON s1clmns.schema_id = usrt.schema_id
+WHERE
+(v.type = @_msparam_0)and(v.name=@_msparam_1 and SCHEMA_NAME(v.schema_id)=@_msparam_2)
+ORDER BY
+[ID] ASC",1,23,88,0xcf22f88afce8b94d,0x934b7c4b3704071e,2
+"(@_msparam_0 nvarchar(4000),@_msparam_1 nvarchar(4000),@_msparam_2 nvarchar(4000))SELECT
+param.is_readonly AS [IsReadOnly],
+param.name AS [Name],
+param.parameter_id AS [ID],
+param.default_value AS [DefaultValue],
+param.has_default_value AS [HasDefaultValue],
+usrt.name AS [DataType],
+s1param.name AS [DataTypeSchema],
+ISNULL(baset.name, N'') AS [SystemType],
+CAST(CASE WHEN baset.name IN (N'nchar', N'nvarchar') AND param.max_length <> -1 THEN param.max_length/2 ELSE param.max_length END AS int) AS [Length],
+CAST(param.precision AS int) AS [NumericPrecision],
+CAST(param.scale AS int) AS [NumericScale],
+ISNULL(xscparam.name, N'') AS [XmlSchemaNamespace],
+ISNULL(s2param.name, N'') AS [XmlSchemaNamespaceSchema],
+ISNULL( (case param.is_xml_document when 1 then 2 else 1 end), 0) AS [XmlDocumentConstraint],
+CASE WHEN usrt.is_table_type = 1 THEN N'structured' ELSE N'' END AS [UserType],
+udf.object_id AS [IDText],
+db_name() AS [DatabaseName],
+param.name AS [ParamName],
+CAST(
+ case 
+    when udf.is_ms_shipped = 1 then 1
+    when (
+        select 
+            major_id 
+        from 
+            sys.extended_properties 
+        where 
+            major_id = udf.object_id and 
+            minor_id = 0 and 
+            class = 1 and 
+            name = N'microsoft_database_tools_support') 
+        is not null then 1
+    else 0
+end          
+             AS bit) AS [ParentSysObj],
+-1 AS [Number]
+FROM
+sys.all_objects AS udf
+INNER JOIN sys.all_parameters AS param ON (param.is_output = 0) AND (param.object_id=udf.object_id)
+LEFT OUTER JOIN sys.types AS usrt ON usrt.user_type_id = param.user_type_id
+LEFT OUTER JOIN sys.schemas AS s1param ON s1param.schema_id = usrt.schema_id
+LEFT OUTER JOIN sys.types AS baset ON (baset.user_type_id = param.system_type_id and baset.user_type_id = baset.system_type_id) or ((baset.system_type_id = param.system_type_id) and (baset.user_type_id = param.user_type_id) and (baset.is_user_defined = 0) and (baset.is_assembly_type = 1)) 
+LEFT OUTER JOIN sys.xml_schema_collections AS xscparam ON xscparam.xml_collection_id = param.xml_collection_id
+LEFT OUTER JOIN sys.schemas AS s2param ON s2param.schema_id = xscparam.schema_id
+WHERE
+(param.name=@_msparam_0)and((udf.type in ('TF', 'FN', 'IF', 'FS', 'FT'))and(udf.name=@_msparam_1 and SCHEMA_NAME(udf.schema_id)=@_msparam_2))",2,1,1,0xa7c5d937eee6d57b,0x155422e67a22ce6d,1
+"(@_msparam_0 nvarchar(4000),@_msparam_1 nvarchar(4000))SELECT
+param.parameter_id AS [ID],
+param.name AS [Name],
+usrt.name AS [DataType],
+ISNULL(baset.name, N'') AS [SystemType],
+CAST(CASE WHEN baset.name IN (N'nchar', N'nvarchar') AND param.max_length <> -1 THEN param.max_length/2 ELSE param.max_length END AS int) AS [Length],
+CAST(param.precision AS int) AS [NumericPrecision],
+CAST(param.scale AS int) AS [NumericScale],
+ISNULL(xscparam.name, N'') AS [XmlSchemaNamespace],
+ISNULL(s2param.name, N'') AS [XmlSchemaNamespaceSchema],
+ISNULL( (case param.is_xml_document when 1 then 2 else 1 end), 0) AS [XmlDocumentConstraint],
+s1param.name AS [DataTypeSchema]
+FROM
+sys.all_objects AS udf
+INNER JOIN sys.all_parameters AS param ON (param.is_output = 0) AND (param.object_id=udf.object_id)
+LEFT OUTER JOIN sys.types AS usrt ON usrt.user_type_id = param.user_type_id
+LEFT OUTER JOIN sys.types AS baset ON (baset.user_type_id = param.system_type_id and baset.user_type_id = baset.system_type_id) or ((baset.system_type_id = param.system_type_id) and (baset.user_type_id = param.user_type_id) and (baset.is_user_defined = 0) and (baset.is_assembly_type = 1)) 
+LEFT OUTER JOIN sys.xml_schema_collections AS xscparam ON xscparam.xml_collection_id = param.xml_collection_id
+LEFT OUTER JOIN sys.schemas AS s2param ON s2param.schema_id = xscparam.schema_id
+LEFT OUTER JOIN sys.schemas AS s1param ON s1param.schema_id = usrt.schema_id
+WHERE
+(udf.type in ('TF', 'FN', 'IF', 'FS', 'FT'))and(udf.name=@_msparam_0 and SCHEMA_NAME(udf.schema_id)=@_msparam_1)
+ORDER BY
+[ID] ASC",0,1,1,0x5644b89b2b847979,0x55e579a50859876a,1
+"(@_msparam_0 nvarchar(4000),@_msparam_1 nvarchar(4000),@_msparam_2 nvarchar(4000))SELECT
+udf.name AS [Name],
+udf.object_id AS [ID],
+udf.create_date AS [CreateDate],
+udf.modify_date AS [DateLastModified],
+ISNULL(sudf.name, N'') AS [Owner],
+CAST(case when udf.principal_id is null then 1 else 0 end AS bit) AS [IsSchemaOwned],
+SCHEMA_NAME(udf.schema_id) AS [Schema],
+CAST(
+ case 
+    when udf.is_ms_shipped = 1 then 1
+    when (
+        select 
+            major_id 
+        from 
+            sys.extended_properties 
+        where 
+            major_id = udf.object_id and 
+            minor_id = 0 and 
+            class = 1 and 
+            name = N'microsoft_database_tools_support') 
+        is not null then 1
+    else 0
+end          
+             AS bit) AS [IsSystemObject],
+usrt.name AS [DataType],
+s1ret_param.name AS [DataTypeSchema],
+ISNULL(baset.name, N'') AS [SystemType],
+CAST(CASE WHEN baset.name IN (N'nchar', N'nvarchar') AND ret_param.max_length <> -1 THEN ret_param.max_length/2 ELSE ret_param.max_length END AS int) AS [Length],
+CAST(ret_param.precision AS int) AS [NumericPrecision],
+CAST(ret_param.scale AS int) AS [NumericScale],
+ISNULL(xscret_param.name, N'') AS [XmlSchemaNamespace],
+ISNULL(s2ret_param.name, N'') AS [XmlSchemaNamespaceSchema],
+ISNULL( (case ret_param.is_xml_document when 1 then 2 else 1 end), 0) AS [XmlDocumentConstraint],
+CASE WHEN usrt.is_table_type = 1 THEN N'structured' ELSE N'' END AS [UserType],
+CAST(ISNULL(OBJECTPROPERTYEX(udf.object_id,N'ExecIsAnsiNullsOn'),0) AS bit) AS [AnsiNullsStatus],
+CAST(ISNULL(OBJECTPROPERTYEX(udf.object_id, N'IsSchemaBound'),0) AS bit) AS [IsSchemaBound],
+CAST(CASE WHEN ISNULL(smudf.definition, ssmudf.definition) IS NULL THEN 1 ELSE 0 END AS bit) AS [IsEncrypted],
+case when amudf.object_id is null then N'' else asmbludf.name end AS [AssemblyName],
+case when amudf.object_id is null then N'' else amudf.assembly_class end AS [ClassName],
+case when amudf.object_id is null then N'' else amudf.assembly_method end AS [MethodName],
+CAST(case when amudf.object_id is null then CAST(smudf.null_on_null_input AS bit) else amudf.null_on_null_input end AS bit) AS [ReturnsNullOnNullInput],
+case when amudf.object_id is null then case isnull(smudf.execute_as_principal_id, -1) when -1 then 1 when -2 then 2 else 3 end else case isnull(amudf.execute_as_principal_id, -1) when -1 then 1 when -2 then 2 else 3 end end AS [ExecutionContext],
+case when amudf.object_id is null then ISNULL(user_name(smudf.execute_as_principal_id),N'') else ISNULL(user_name(amudf.execute_as_principal_id), N'') end AS [ExecutionContextPrincipal],
+CAST(OBJECTPROPERTYEX(udf.object_id, N'IsDeterministic') AS bit) AS [IsDeterministic],
+(case when 'FN' = udf.type then 1 when 'FS' = udf.type then 1 when 'IF' = udf.type then 3 when 'TF' = udf.type then 2 when 'FT' = udf.type then 2 else 0 end) AS [FunctionType],
+CASE WHEN udf.type IN ('FN','IF','TF') THEN 1 WHEN udf.type IN ('FS','FT') THEN 2 ELSE 1 END AS [ImplementationType],
+CAST(ISNULL(OBJECTPROPERTYEX(udf.object_id,N'ExecIsQuotedIdentOn'),0) AS bit) AS [QuotedIdentifierStatus],
+ret_param.name AS [TableVariableName],
+ISNULL(sm.uses_native_compilation,0) AS [IsNativelyCompiled],
+CAST(ISNULL(sm.inline_type,0) AS bit) AS [InlineType],
+CAST(ISNULL(sm.is_inlineable,0) AS bit) AS [IsInlineable],
+ISNULL(smudf.definition, ssmudf.definition) AS [Definition]
+FROM
+sys.all_objects AS udf
+LEFT OUTER JOIN sys.database_principals AS sudf ON sudf.principal_id = ISNULL(udf.principal_id, (OBJECTPROPERTY(udf.object_id, 'OwnerId')))
+LEFT OUTER JOIN sys.all_parameters AS ret_param ON ret_param.object_id = udf.object_id and ret_param.is_output = @_msparam_0
+LEFT OUTER JOIN sys.types AS usrt ON usrt.user_type_id = ret_param.user_type_id
+LEFT OUTER JOIN sys.schemas AS s1ret_param ON s1ret_param.schema_id = usrt.schema_id
+LEFT OUTER JOIN sys.types AS baset ON (baset.user_type_id = ret_param.system_type_id and baset.user_type_id = baset.system_type_id) or ((baset.system_type_id = ret_param.system_type_id) and (baset.user_type_id = ret_param.user_type_id) and (baset.is_user_defined = 0) and (baset.is_assembly_type = 1)) 
+LEFT OUTER JOIN sys.xml_schema_collections AS xscret_param ON xscret_param.xml_collection_id = ret_param.xml_collection_id
+LEFT OUTER JOIN sys.schemas AS s2ret_param ON s2ret_param.schema_id = xscret_param.schema_id
+LEFT OUTER JOIN sys.sql_modules AS smudf ON smudf.object_id = udf.object_id
+LEFT OUTER JOIN sys.system_sql_modules AS ssmudf ON ssmudf.object_id = udf.object_id
+LEFT OUTER JOIN sys.assembly_modules AS amudf ON amudf.object_id = udf.object_id
+LEFT OUTER JOIN sys.assemblies AS asmbludf ON asmbludf.assembly_id = amudf.assembly_id
+LEFT OUTER JOIN sys.all_sql_modules AS sm ON sm.object_id = udf.object_id
+WHERE
+(udf.type in ('TF', 'FN', 'IF', 'FS', 'FT'))and(udf.name=@_msparam_1 and SCHEMA_NAME(udf.schema_id)=@_msparam_2)",0,1,1,0x8ffb5273ead907ce,0x4a14e7d2c24e3ffd,1
+"(@_msparam_0 nvarchar(4000),@_msparam_1 nvarchar(4000))SELECT
+NULL AS [Text],
+ISNULL(smudf.definition, ssmudf.definition) AS [Definition]
+FROM
+sys.all_objects AS udf
+LEFT OUTER JOIN sys.sql_modules AS smudf ON smudf.object_id = udf.object_id
+LEFT OUTER JOIN sys.system_sql_modules AS ssmudf ON ssmudf.object_id = udf.object_id
+WHERE
+(udf.type in ('TF', 'FN', 'IF', 'FS', 'FT'))and(udf.name=@_msparam_0 and SCHEMA_NAME(udf.schema_id)=@_msparam_1)",1,1,1,0xb59b3ddbef4650b0,0xace34f24cc24e5f9,1
+"    SELECT
+    text, total_num_physical_reads, min_rows, max_rows, query_hash, query_plan_hash, execution_count
+    FROM 
+      sys.dm_exec_query_stats AS deqs
+      CROSS APPLY sys.dm_exec_sql_text(deqs.sql_handle) AS dest
+    ORDER BY 
+      deqs.last_execution_time DESC",0,159,159,0x7ea492652c93f36f,0x77cdeba7e046f066,1
+"SELECT
+satypes.name AS [Schema],
+atypes.name AS [Name]
+FROM
+sys.assembly_types AS atypes
+INNER JOIN sys.assemblies AS asmbl ON (asmbl.assembly_id = atypes.assembly_id) and (atypes.is_user_defined = 1)
+INNER JOIN sys.schemas AS satypes ON satypes.schema_id = atypes.schema_id
+ORDER BY
+[Schema] ASC,[Name] ASC",0,0,0,0x6eaf78ed57b77b37,0x42147a806f944a62,1
+"SELECT
+SCHEMA_NAME(tt.schema_id) AS [Schema],
+tt.name AS [Name]
+FROM
+sys.table_types AS tt
+INNER JOIN sys.schemas AS stt ON stt.schema_id = tt.schema_id
+ORDER BY
+[Schema] ASC,[Name] ASC",0,0,0,0xc738b306aa6b57b5,0x206413ca87ae980d,1
+"SELECT
+sst.name AS [Schema],
+st.name AS [Name]
+FROM
+sys.types AS st
+INNER JOIN sys.schemas AS sst ON sst.schema_id = st.schema_id
+WHERE
+(st.schema_id!=4 and st.system_type_id!=240 and st.user_type_id != st.system_type_id and st.is_table_type != 1)
+ORDER BY
+[Schema] ASC,[Name] ASC",1,0,0,0xebf4a17aca6fcf73,0xce91030cde6db8a3,1
+"SELECT
+SCHEMA_NAME(xproc.schema_id) AS [Schema],
+xproc.name AS [Name],
+xproc.object_id AS [ID],
+CAST(
+                xproc.is_ms_shipped
+            AS bit) AS [IsSystemObject]
+FROM
+sys.all_objects AS xproc
+WHERE
+(xproc.type='X')
+ORDER BY
+[Schema] ASC,[Name] ASC",0,204,204,0xd9c1f500413e514f,0xeb919dd1dffe113c,1
+"SELECT
+SCHEMA_NAME(s.schema_id) AS [Schema],
+s.name AS [Name],
+s.object_id AS [ID],
+N'' AS [BaseDatabase],
+N'' AS [BaseObject],
+N'' AS [BaseSchema],
+N'' AS [BaseServer],
+
+			CASE OBJECTPROPERTYEX(s.object_id,'BaseType') 
+				WHEN N'U' THEN 1 
+				WHEN N'V' THEN 2 
+				WHEN N'P' THEN 3 
+				WHEN N'FN' THEN 4 
+				WHEN N'TF' THEN 5 
+				WHEN N'IF' THEN 6 
+				WHEN N'X' THEN 7 
+				WHEN N'RF' THEN 8 
+				WHEN N'PC' THEN 9 
+				WHEN N'FS' THEN 10 
+				WHEN N'FT' THEN 11 
+				WHEN N'AF' THEN 12 ELSE 0 END
+		 AS [BaseType],
+s.base_object_name AS [BaseObjectName]
+FROM
+sys.synonyms AS s
+ORDER BY
+[Schema] ASC,[Name] ASC",0,0,0,0x6952474f1d78bc9b,0x2e7e271a18b021a1,1
+"(@_msparam_0 nvarchar(4000),@_msparam_1 nvarchar(4000),@_msparam_2 nvarchar(4000))SELECT
+SCHEMA_NAME(sp.schema_id) AS [Schema],
+sp.name AS [Name],
+sp.object_id AS [ID],
+CAST(
+ case 
+    when sp.is_ms_shipped = 1 then 1
+    when (
+        select 
+            major_id 
+        from 
+            sys.extended_properties 
+        where 
+            major_id = sp.object_id and 
+            minor_id = 0 and 
+            class = 1 and 
+            name = N'microsoft_database_tools_support') 
+        is not null then 1
+    else 0
+end          
+             AS bit) AS [IsSystemObject],
+CASE WHEN sp.type = N'P' THEN 1 WHEN sp.type = N'PC' THEN 2 ELSE 1 END AS [ImplementationType],
+CAST(CASE WHEN ISNULL(smsp.definition, ssmsp.definition) IS NULL THEN 1 ELSE 0 END AS bit) AS [IsEncrypted]
+FROM
+sys.all_objects AS sp
+LEFT OUTER JOIN sys.sql_modules AS smsp ON smsp.object_id = sp.object_id
+LEFT OUTER JOIN sys.system_sql_modules AS ssmsp ON ssmsp.object_id = sp.object_id
+WHERE
+(sp.type = @_msparam_0 OR sp.type = @_msparam_1 OR sp.type=@_msparam_2)
+ORDER BY
+[Schema] ASC,[Name] ASC",523,1423,1423,0xe2d481769b70e309,0xf98b361caf20a317,1
+"(@_msparam_0 nvarchar(4000))SELECT
+SCHEMA_NAME(udf.schema_id) AS [Schema],
+udf.name AS [Name],
+udf.object_id AS [ID],
+(case when 'FN' = udf.type then 1 when 'FS' = udf.type then 1 when 'IF' = udf.type then 3 when 'TF' = udf.type then 2 when 'FT' = udf.type then 2 else 0 end) AS [FunctionType],
+CASE WHEN udf.type IN ('FN','IF','TF') THEN 1 WHEN udf.type IN ('FS','FT') THEN 2 ELSE 1 END AS [ImplementationType],
+CAST(
+ case 
+    when udf.is_ms_shipped = 1 then 1
+    when (
+        select 
+            major_id 
+        from 
+            sys.extended_properties 
+        where 
+            major_id = udf.object_id and 
+            minor_id = 0 and 
+            class = 1 and 
+            name = N'microsoft_database_tools_support') 
+        is not null then 1
+    else 0
+end          
+             AS bit) AS [IsSystemObject],
+CAST(CASE WHEN ISNULL(smudf.definition, ssmudf.definition) IS NULL THEN 1 ELSE 0 END AS bit) AS [IsEncrypted],
+CAST(ISNULL(OBJECTPROPERTYEX(udf.object_id, N'IsSchemaBound'),0) AS bit) AS [IsSchemaBound],
+usrt.name AS [DataType],
+ISNULL(baset.name, N'') AS [SystemType],
+CAST(CASE WHEN baset.name IN (N'nchar', N'nvarchar') AND ret_param.max_length <> -1 THEN ret_param.max_length/2 ELSE ret_param.max_length END AS int) AS [Length],
+CAST(ret_param.precision AS int) AS [NumericPrecision],
+CAST(ret_param.scale AS int) AS [NumericScale],
+ISNULL(xscret_param.name, N'') AS [XmlSchemaNamespace],
+ISNULL(s2ret_param.name, N'') AS [XmlSchemaNamespaceSchema],
+ISNULL( (case ret_param.is_xml_document when 1 then 2 else 1 end), 0) AS [XmlDocumentConstraint],
+s1ret_param.name AS [DataTypeSchema]
+FROM
+sys.all_objects AS udf
+LEFT OUTER JOIN sys.sql_modules AS smudf ON smudf.object_id = udf.object_id
+LEFT OUTER JOIN sys.system_sql_modules AS ssmudf ON ssmudf.object_id = udf.object_id
+LEFT OUTER JOIN sys.all_parameters AS ret_param ON ret_param.object_id = udf.object_id and ret_param.is_output = @_msparam_0
+LEFT OUTER JOIN sys.types AS usrt ON usrt.user_type_id = ret_param.user_type_id
+LEFT OUTER JOIN sys.types AS baset ON (baset.user_type_id = ret_param.system_type_id and baset.user_type_id = baset.system_type_id) or ((baset.system_type_id = ret_param.system_type_id) and (baset.user_type_id = ret_param.user_type_id) and (baset.is_user_defined = 0) and (baset.is_assembly_type = 1)) 
+LEFT OUTER JOIN sys.xml_schema_collections AS xscret_param ON xscret_param.xml_collection_id = ret_param.xml_collection_id
+LEFT OUTER JOIN sys.schemas AS s2ret_param ON s2ret_param.schema_id = xscret_param.schema_id
+LEFT OUTER JOIN sys.schemas AS s1ret_param ON s1ret_param.schema_id = usrt.schema_id
+WHERE
+(udf.type in ('TF', 'FN', 'IF', 'FS', 'FT'))
+ORDER BY
+[Schema] ASC,[Name] ASC",1088,133,133,0x6f10f71062cb980d,0x97570a4d8889f7df,1
+"SELECT
+SCHEMA_NAME(obj.schema_id) AS [Schema],
+obj.name AS [Name],
+obj.object_id AS [ID],
+usrt.name AS [DataType],
+ISNULL(baset.name, N'') AS [SystemType],
+CAST(CASE WHEN baset.name IN (N'nchar', N'nvarchar') AND ret_param.max_length <> -1 THEN ret_param.max_length/2 ELSE ret_param.max_length END AS int) AS [Length],
+CAST(ret_param.precision AS int) AS [NumericPrecision],
+CAST(ret_param.scale AS int) AS [NumericScale],
+ISNULL(xscret_param.name, N'') AS [XmlSchemaNamespace],
+ISNULL(s2ret_param.name, N'') AS [XmlSchemaNamespaceSchema],
+ISNULL( (case ret_param.is_xml_document when 1 then 2 else 1 end), 0) AS [XmlDocumentConstraint],
+s1ret_param.name AS [DataTypeSchema]
+FROM
+sys.objects AS obj
+LEFT OUTER JOIN sys.all_parameters AS ret_param ON ret_param.object_id = obj.object_id and ret_param.is_output = 1
+LEFT OUTER JOIN sys.types AS usrt ON usrt.user_type_id = ret_param.user_type_id
+LEFT OUTER JOIN sys.types AS baset ON (baset.user_type_id = ret_param.system_type_id and baset.user_type_id = baset.system_type_id) or ((baset.system_type_id = ret_param.system_type_id) and (baset.user_type_id = ret_param.user_type_id) and (baset.is_user_defined = 0) and (baset.is_assembly_type = 1)) 
+LEFT OUTER JOIN sys.xml_schema_collections AS xscret_param ON xscret_param.xml_collection_id = ret_param.xml_collection_id
+LEFT OUTER JOIN sys.schemas AS s2ret_param ON s2ret_param.schema_id = xscret_param.schema_id
+LEFT OUTER JOIN sys.schemas AS s1ret_param ON s1ret_param.schema_id = usrt.schema_id
+WHERE
+(obj.type=N'AF')
+ORDER BY
+[Schema] ASC,[Name] ASC",8,0,0,0x65b7ddbbddbb7a3e,0xbf69938c99277fe1,1
+"(@_msparam_0 nvarchar(4000))SELECT
+SCHEMA_NAME(v.schema_id) AS [Schema],
+v.name AS [Name],
+v.object_id AS [ID]
+FROM
+sys.all_views AS v
+WHERE
+(v.type = @_msparam_0)
+ORDER BY
+[Schema] ASC,[Name] ASC",298,534,534,0xd9bfe0aeb1b674bf,0xeb919dd1dffe113c,1
+"SELECT
+SCHEMA_NAME(tbl.schema_id) AS [Schema],
+tbl.name AS [Name],
+tbl.object_id AS [ID]
+FROM
+sys.tables AS tbl
+ORDER BY
+[Schema] ASC,[Name] ASC",13,5,5,0x68819aded6ff3bc1,0x6a6afbf4d9dede0d,1
+"SELECT
+(select schema_name()) AS [DefaultSchema]",0,1,1,0x0a6673eab3c7e30f,0xfd2f6fa1f14846e6,1
+"(@_msparam_0 nvarchar(4000),@_msparam_1 nvarchar(4000))SELECT
+u.name AS [Name],
+u.principal_id AS [ID],
+CAST(CASE WHEN u.principal_id < 5 OR u.principal_id = 16382 OR u.principal_id = 16383 THEN 1 ELSE 0 END AS bit) AS [IsSystemObject],
+CASE WHEN N'U' = u.type THEN 0 WHEN N'G' = u.type THEN 1 WHEN N'S' = u.type THEN 2 WHEN N'C' = u.type THEN 3 WHEN N'K' = u.type THEN 4 WHEN N'E' = u.type THEN 5 WHEN N'X' = u.type THEN 6 END AS [LoginType],
+CAST(CASE dp.state WHEN N'G' THEN 1 WHEN 'W' THEN 1 ELSE 0 END AS bit) AS [HasDBAccess],
+u.sid AS [Sid],
+u.create_date AS [CreateDate],
+u.modify_date AS [DateLastModified],
+ISNULL(u.default_schema_name,N'') AS [DefaultSchema],
+ISNULL(ak.name,N'') AS [AsymmetricKey],
+ISNULL(cert.name,N'') AS [Certificate],
+ISNULL(suser_sname(u.sid),N'') AS [Login],
+ISNULL(u.default_language_lcid, -1) AS [DefaultLanguageLcid],
+ISNULL(u.default_language_name,N'') AS [DefaultLanguageName],
+u.authentication_type AS [AuthenticationType],
+
+        CASE
+        WHEN N'C' = u.type THEN 1
+        WHEN N'K' = u.type THEN 2        
+        WHEN N'S' = u.type AND SUSER_SNAME(u.sid) is null AND u.authentication_type != 2 THEN 3
+        ELSE 0 END
+       AS [UserType]
+FROM
+sys.database_principals AS u
+LEFT OUTER JOIN sys.database_permissions AS dp ON dp.grantee_principal_id = u.principal_id and dp.type = @_msparam_0
+LEFT OUTER JOIN sys.asymmetric_keys AS ak ON ak.sid = u.sid
+LEFT OUTER JOIN sys.certificates AS cert ON cert.sid = u.sid
+WHERE
+(u.type in ('U', 'S', 'G', 'C', 'K' ,'E', 'X'))and(u.name=@_msparam_1)",2,1,1,0xac5d01c2feda6320,0x2adcde55661f6e7b,2
+"SELECT
+u.name AS [Name],
+u.principal_id AS [ID],
+ISNULL(ak.name,N'') AS [AsymmetricKey],
+ISNULL(cert.name,N'') AS [Certificate],
+ISNULL(suser_sname(u.sid),N'') AS [Login],
+
+        CASE
+        WHEN N'C' = u.type THEN 1
+        WHEN N'K' = u.type THEN 2        
+        WHEN N'S' = u.type AND SUSER_SNAME(u.sid) is null AND u.authentication_type != 2 THEN 3
+        ELSE 0 END
+       AS [UserType]
+FROM
+sys.database_principals AS u
+LEFT OUTER JOIN sys.asymmetric_keys AS ak ON ak.sid = u.sid
+LEFT OUTER JOIN sys.certificates AS cert ON cert.sid = u.sid
+WHERE
+(u.type in ('U', 'S', 'G', 'C', 'K' ,'E', 'X'))
+ORDER BY
+[Name] ASC",0,6,6,0x791e9e04262ef1eb,0x8c86824940796cd3,1
+"SELECT
+tr.name AS [Name],
+tr.object_id AS [ID],
+CAST(
+                tr.is_ms_shipped
+            AS bit) AS [IsSystemObject],
+CASE WHEN tr.type = N'TR' THEN 1 WHEN tr.type = N'TA' THEN 2 ELSE 1 END AS [ImplementationType],
+CAST(CASE WHEN ISNULL(smtr.definition, ssmtr.definition) IS NULL THEN 1 ELSE 0 END AS bit) AS [IsEncrypted]
+FROM
+sys.triggers AS tr
+LEFT OUTER JOIN sys.sql_modules AS smtr ON smtr.object_id = tr.object_id
+LEFT OUTER JOIN sys.system_sql_modules AS ssmtr ON ssmtr.object_id = tr.object_id
+WHERE
+(tr.parent_class = 0)
+ORDER BY
+[Name] ASC",4,0,0,0xbe4b25fcc059af08,0xdc062ecfc418c70a,1
+"SELECT
+s.name AS [Name]
+FROM
+sys.schemas AS s
+ORDER BY
+[Name] ASC",0,13,13,0xd0fd09682e9b2ed6,0xcf72d01d8624c097,1
+"SELECT
+rl.name AS [Name]
+FROM
+sys.database_principals AS rl
+WHERE
+(rl.type = 'R')
+ORDER BY
+[Name] ASC",0,10,10,0x83ccac2aaf467bfc,0xb4e4f5471f9a4608,1
+"SELECT
+rl.name AS [Name]
+FROM
+sys.database_principals AS rl
+WHERE
+(rl.type = 'A')
+ORDER BY
+[Name] ASC",1,0,0,0x83ccac2aaf467bfc,0xb4e4f5471f9a4608,1
+"(@_msparam_0 nvarchar(4000))SELECT
+dtb.catalog_collation_type AS [CatalogCollation]
+FROM
+master.sys.databases AS dtb
+WHERE
+(dtb.name=@_msparam_0)",0,1,1,0x136b61b73d250f29,0x86ab1dd1f0089e39,1
+"SELECT
+tr.name AS [Name],
+tr.object_id AS [ID],
+CAST(
+                tr.is_ms_shipped
+            AS bit) AS [IsSystemObject],
+CASE WHEN tr.type = N'TR' THEN 1 WHEN tr.type = N'TA' THEN 2 ELSE 1 END AS [ImplementationType],
+CAST(CASE WHEN ssmod.definition IS NULL THEN 1 ELSE 0 END AS bit) AS [IsEncrypted]
+FROM
+master.sys.server_triggers AS tr
+LEFT OUTER JOIN master.sys.server_assembly_modules AS mod ON mod.object_id = tr.object_id
+LEFT OUTER JOIN sys.server_sql_modules AS ssmod ON ssmod.object_id = tr.object_id
+WHERE
+(tr.parent_class = 100)
+ORDER BY
+[Name] ASC",2,0,0,0x606553f55874f4f6,0xa1547060fb7c4015,1
+"SELECT
+log.name AS [Name],
+log.principal_id AS [ID],
+ISNULL(ak.name,N'') AS [AsymmetricKey],
+ISNULL(cert.name,N'') AS [Certificate],
+ISNULL(c.name,N'') AS [Credential],
+CASE WHEN N'U' = log.type THEN 0 WHEN N'G' = log.type THEN 1 WHEN N'S' = log.type THEN 2 WHEN N'C' = log.type THEN 3 WHEN N'K' = log.type THEN 4  WHEN N'E' = log.type THEN 5 WHEN N'X' = log.type THEN 6 END AS [LoginType]
+FROM
+sys.server_principals AS log
+LEFT OUTER JOIN master.sys.asymmetric_keys AS ak ON ak.sid = log.sid
+LEFT OUTER JOIN master.sys.certificates AS cert ON cert.sid = log.sid
+LEFT OUTER JOIN sys.credentials AS c ON c.credential_id = log.credential_id
+WHERE
+(log.type in ('U', 'G', 'S', 'C', 'K', 'E', 'X') AND log.principal_id not between 101 and 255 AND log.name <> N'##MS_AgentSigningCertificate##')
+ORDER BY
+[Name] ASC",1,10,10,0xd3833a3d2f7e0e89,0x0bee3a68061ad049,1
+"SELECT
+dtb.name AS [Name],
+dtb.database_id AS [ID],
+CAST(case when dtb.name in ('master','model','msdb','tempdb') then 1 else dtb.is_distributor end AS bit) AS [IsSystemObject],
+dtb.collation_name AS [Collation],
+CAST(has_dbaccess(dtb.name) AS bit) AS [IsAccessible],
+dtb.name AS [DatabaseName2]
+FROM
+master.sys.databases AS dtb
+ORDER BY
+[Name] ASC",0,5,5,0x4dc5a13c2942b14e,0x4b0f0d3f6326cf2e,1
+"
+        declare @MasterPath nvarchar(512)
+        declare @LogPath nvarchar(512)
+        declare @ErrorLog nvarchar(512)
+        declare @ErrorLogPath nvarchar(512)
+        declare @Slash varchar = convert(varchar, serverproperty('PathSeparator'))
+        if (SERVERPROPERTY('EngineEdition') = 8 /* SQL Managed Instance */)
+        begin
+          select @MasterPath=substring(physical_name, 1, len(physical_name) - charindex(@Slash, reverse(physical_name))) from master.sys.database_files where file_id = 1
+          select @LogPath=substring(physical_name, 1, len(physical_name) - charindex(@Slash, reverse(physical_name))) from master.sys.database_files where file_id = 2
+        end
+        else
+        begin
+          select @MasterPath=substring(physical_name, 1, len(physical_name) - charindex(@Slash, reverse(physical_name))) from master.sys.database_files where name=N'master'
+          select @LogPath=substring(physical_name, 1, len(physical_name) - charindex(@Slash, reverse(physical_name))) from master.sys.database_files where name=N'mastlog'
+        end
+        select @ErrorLog=cast(SERVERPROPERTY(N'errorlogfilename') as nvarchar(512))
+        select @ErrorLogPath=IIF(@ErrorLog IS NULL, N'', substring(@ErrorLog, 1, len(@ErrorLog) - charindex(@Slash, reverse(@ErrorLog))))
+      
+
+
+        declare @SmoRoot nvarchar(512)
+        exec master.dbo.xp_instance_regread N'HKEY_LOCAL_MACHINE', N'SOFTWARE\Microsoft\MSSQLServer\Setup', N'SQLPath', @SmoRoot OUTPUT
+      
+
+
+SELECT
+CAST(case when 'a' <> 'A' then 1 else 0 end AS bit) AS [IsCaseSensitive],
+@@MAX_PRECISION AS [MaxPrecision],
+@ErrorLogPath AS [ErrorLogPath],
+@SmoRoot AS [RootDirectory],
+SERVERPROPERTY('PathSeparator') AS [PathSeparator],
+CAST(FULLTEXTSERVICEPROPERTY('IsFullTextInstalled') AS bit) AS [IsFullTextInstalled],
+@LogPath AS [MasterDBLogPath],
+@MasterPath AS [MasterDBPath],
+SERVERPROPERTY(N'ProductVersion') AS [VersionString],
+CAST(SERVERPROPERTY(N'Edition') AS sysname) AS [Edition],
+CAST(SERVERPROPERTY(N'ProductLevel') AS sysname) AS [ProductLevel],
+CAST(SERVERPROPERTY('IsSingleUser') AS bit) AS [IsSingleUser],
+CAST(SERVERPROPERTY('EngineEdition') AS int) AS [EngineEdition],
+convert(sysname, serverproperty(N'collation')) AS [Collation],
+CAST(ISNULL(SERVERPROPERTY(N'MachineName'),N'') AS sysname) AS [NetName],
+CAST(ISNULL(SERVERPROPERTY('IsClustered'),N'') AS bit) AS [IsClustered],
+SERVERPROPERTY(N'ResourceVersion') AS [ResourceVersionString],
+SERVERPROPERTY(N'ResourceLastUpdateDateTime') AS [ResourceLastUpdateDateTime],
+SERVERPROPERTY(N'CollationID') AS [CollationID],
+SERVERPROPERTY(N'ComparisonStyle') AS [ComparisonStyle],
+SERVERPROPERTY(N'SqlCharSet') AS [SqlCharSet],
+SERVERPROPERTY(N'SqlCharSetName') AS [SqlCharSetName],
+SERVERPROPERTY(N'SqlSortOrder') AS [SqlSortOrder],
+SERVERPROPERTY(N'SqlSortOrderName') AS [SqlSortOrderName],
+SERVERPROPERTY(N'BuildClrVersion') AS [BuildClrVersionString],
+ISNULL(SERVERPROPERTY(N'ComputerNamePhysicalNetBIOS'),N'') AS [ComputerNamePhysicalNetBIOS],
+CAST(SERVERPROPERTY('IsPolyBaseInstalled') AS bit) AS [IsPolyBaseInstalled]",0,1,1,0x22c7b8ea78612f18,0x3daec7f12757e3ea,1
+"
+        declare @MasterPath nvarchar(512)
+        declare @LogPath nvarchar(512)
+        declare @ErrorLog nvarchar(512)
+        declare @ErrorLogPath nvarchar(512)
+        declare @Slash varchar = convert(varchar, serverproperty('PathSeparator'))
+        if (SERVERPROPERTY('EngineEdition') = 8 /* SQL Managed Instance */)
+        begin
+          select @MasterPath=substring(physical_name, 1, len(physical_name) - charindex(@Slash, reverse(physical_name))) from master.sys.database_files where file_id = 1
+          select @LogPath=substring(physical_name, 1, len(physical_name) - charindex(@Slash, reverse(physical_name))) from master.sys.database_files where file_id = 2
+        end
+        else
+        begin
+          select @MasterPath=substring(physical_name, 1, len(physical_name) - charindex(@Slash, reverse(physical_name))) from master.sys.database_files where name=N'master'
+          select @LogPath=substring(physical_name, 1, len(physical_name) - charindex(@Slash, reverse(physical_name))) from master.sys.database_files where name=N'mastlog'
+        end
+        select @ErrorLog=cast(SERVERPROPERTY(N'errorlogfilename') as nvarchar(512))
+        select @ErrorLogPath=IIF(@ErrorLog IS NULL, N'', substring(@ErrorLog, 1, len(@ErrorLog) - charindex(@Slash, reverse(@ErrorLog))))
+      
+
+
+        declare @SmoRoot nvarchar(512)
+        exec master.dbo.xp_instance_regread N'HKEY_LOCAL_MACHINE', N'SOFTWARE\Microsoft\MSSQLServer\Setup', N'SQLPath', @SmoRoot OUTPUT
+      
+
+
+SELECT
+CAST(case when 'a' <> 'A' then 1 else 0 end AS bit) AS [IsCaseSensitive],
+@@MAX_PRECISION AS [MaxPrecision],
+@ErrorLogPath AS [ErrorLogPath],
+@SmoRoot AS [RootDirectory],
+SERVERPROPERTY('PathSeparator') AS [PathSeparator],
+CAST(FULLTEXTSERVICEPROPERTY('IsFullTextInstalled') AS bit) AS [IsFullTextInstalled],
+@LogPath AS [MasterDBLogPath],
+@MasterPath AS [MasterDBPath],
+SERVERPROPERTY(N'ProductVersion') AS [VersionString],
+CAST(SERVERPROPERTY(N'Edition') AS sysname) AS [Edition],
+CAST(SERVERPROPERTY(N'ProductLevel') AS sysname) AS [ProductLevel],
+CAST(SERVERPROPERTY('IsSingleUser') AS bit) AS [IsSingleUser],
+CAST(SERVERPROPERTY('EngineEdition') AS int) AS [EngineEdition],
+convert(sysname, serverproperty(N'collation')) AS [Collation],
+CAST(ISNULL(SERVERPROPERTY(N'MachineName'),N'') AS sysname) AS [NetName],
+CAST(ISNULL(SERVERPROPERTY('IsClustered'),N'') AS bit) AS [IsClustered],
+SERVERPROPERTY(N'ResourceVersion') AS [ResourceVersionString],
+SERVERPROPERTY(N'ResourceLastUpdateDateTime') AS [ResourceLastUpdateDateTime],
+SERVERPROPERTY(N'CollationID') AS [CollationID],
+SERVERPROPERTY(N'ComparisonStyle') AS [ComparisonStyle],
+SERVERPROPERTY(N'SqlCharSet') AS [SqlCharSet],
+SERVERPROPERTY(N'SqlCharSetName') AS [SqlCharSetName],
+SERVERPROPERTY(N'SqlSortOrder') AS [SqlSortOrder],
+SERVERPROPERTY(N'SqlSortOrderName') AS [SqlSortOrderName],
+SERVERPROPERTY(N'BuildClrVersion') AS [BuildClrVersionString],
+ISNULL(SERVERPROPERTY(N'ComputerNamePhysicalNetBIOS'),N'') AS [ComputerNamePhysicalNetBIOS],
+CAST(SERVERPROPERTY('IsPolyBaseInstalled') AS bit) AS [IsPolyBaseInstalled]",0,1,1,0x22c7b8ea78612f18,0x3daec7f12757e3ea,1
+"DECLARE @edition sysname;
+SET @edition = cast(SERVERPROPERTY(N'EDITION') as sysname);
+SELECT case when @edition = N'SQL Azure' then 2 else 1 end as 'DatabaseEngineType',
+SERVERPROPERTY('EngineEdition') AS DatabaseEngineEdition,
+SERVERPROPERTY('ProductVersion') AS ProductVersion,
+@@MICROSOFTVERSION AS MicrosoftVersion;
+select host_platform from sys.dm_os_host_info
+if @edition = N'SQL Azure' 
+  select 'TCP' as ConnectionProtocol
+else
+  exec ('select CONVERT(nvarchar(40),CONNECTIONPROPERTY(''net_transport'')) as ConnectionProtocol')
+",0,1,1,0x98a530ce5357b9bf,0x4b1601c2e8424866,11
+"(@_msparam_0 nvarchar(4000))SELECT
+'PolicyStore[@Name=' + quotename(CAST(serverproperty(N'Servername') AS sysname),'''') + ']' AS [Urn],
+CAST(serverproperty(N'Servername') AS sysname) AS [Name],
+CAST(
+		(SELECT current_value FROM msdb.dbo.syspolicy_configuration WHERE name = 'Enabled')
+	 AS bit) AS [Enabled],
+CAST(
+		(SELECT current_value FROM msdb.dbo.syspolicy_configuration WHERE name = 'HistoryRetentionInDays')
+	 AS int) AS [HistoryRetentionInDays],
+CAST(
+    (SELECT current_value FROM msdb.dbo.syspolicy_configuration WHERE name = 'LogOnSuccess')
+   AS bit) AS [LogOnSuccess]
+WHERE
+(CAST(serverproperty(N'Servername') AS sysname)=@_msparam_0)",1,1,1,0x0db0a8b4aec8cfc8,0xf04f101d794470d6,2
+"
+          create table #SVer(ID int,  Name  sysname, Internal_Value int, Value nvarchar(512))
+          insert #SVer exec master.dbo.xp_msver
+          insert #SVer select t.*
+          from sys.dm_os_host_info
+          CROSS APPLY (
+          VALUES
+          (1001, 'host_platform', 0, host_platform),
+          (1002, 'host_distribution', 0, host_distribution),
+          (1003, 'host_release', 0, host_release),
+          (1004, 'host_service_pack_level', 0, host_service_pack_level),
+          (1005, 'host_sku', host_sku, ''),
+          (1006, 'HardwareGeneration', '', ''),
+          (1007, 'ServiceTier', '', ''),
+          (1008, 'ReservedStorageSizeMB', '0', '0'),
+          (1009, 'UsedStorageSizeMB', '0', '0')
+          ) t(id, [name], internal_value, [value])
+
+          -- Managed Instance-specific properties
+          if (SERVERPROPERTY('EngineEdition') = 8)
+          begin
+            DECLARE @gen4memoryPerCoreMB float = 7168.0
+            DECLARE @gen5memoryPerCoreMB float = 5223.0
+            DECLARE @physicalMemory float
+            DECLARE @virtual_core_count int
+            DECLARE @reservedStorageSize bigint
+            DECLARE @usedStorageSize decimal(18,2)
+            DECLARE @hwGeneration nvarchar(128)
+            DECLARE @serviceTier nvarchar(128)
+
+            SET @physicalMemory = (SELECT TOP 1 [virtual_core_count] *
+              (
+                CASE WHEN [hardware_generation] = 'Gen4' THEN @gen4memoryPerCoreMB
+                WHEN [hardware_generation] = 'Gen5' THEN @gen5memoryPerCoreMB
+                ELSE 0 END
+               )
+               FROM master.sys.server_resource_stats 
+               ORDER BY start_time DESC)
+      
+            IF (@physicalMemory <> 0) 
+            BEGIN
+              UPDATE #SVer SET [Internal_Value] =  @physicalMemory WHERE Name = N'PhysicalMemory'
+              UPDATE #SVer SET [Value] = CONCAT( @physicalMemory, ' (',  @physicalMemory * 1024, ')') WHERE Name = N'PhysicalMemory'
+            END
+
+            UPDATE #SVer SET [Internal_Value] = (SELECT TOP 1 [virtual_core_count] FROM master.sys.server_resource_stats ORDER BY start_time desc) WHERE Name = N'ProcessorCount'
+            UPDATE #SVer SET [Value] = [Internal_Value] WHERE Name = N'ProcessorCount'
+
+            SELECT TOP 1
+              @hwGeneration = [hardware_generation],
+              @serviceTier =[sku],
+              @virtual_core_count = [virtual_core_count],
+              @reservedStorageSize = [reserved_storage_mb],
+              @usedStorageSize = [storage_space_used_mb]
+            FROM master.sys.server_resource_stats
+            ORDER BY [start_time] DESC
+
+            UPDATE #SVer SET [Value] = @hwGeneration WHERE Name = N'HardwareGeneration'
+            UPDATE #SVer SET [Value] = @serviceTier WHERE Name = N'ServiceTier'
+            UPDATE #SVer SET [Value] = @reservedStorageSize WHERE Name = N'ReservedStorageSizeMB'
+            UPDATE #SVer SET [Value] = @usedStorageSize WHERE Name = N'UsedStorageSizeMB'
+          end
+      
+
+
+SELECT
+CAST(
+        serverproperty(N'Servername')
+       AS sysname) AS [Server_Name],
+'Server[@Name=' + quotename(CAST(
+        serverproperty(N'Servername')
+       AS sysname),'''') + ']' AS [Server_Urn],
+CAST(null AS int) AS [Server_ServerType],
+0 AS [Server_IsContainedAuthentication],
+(@@microsoftversion / 0x1000000) & 0xff AS [VersionMajor],
+(@@microsoftversion / 0x10000) & 0xff AS [VersionMinor],
+@@microsoftversion & 0xffff AS [BuildNumber],
+CAST(SERVERPROPERTY('IsSingleUser') AS bit) AS [IsSingleUser],
+CAST(SERVERPROPERTY(N'Edition') AS sysname) AS [Edition],
+CAST(SERVERPROPERTY('EngineEdition') AS int) AS [EngineEdition],
+CAST(ISNULL(SERVERPROPERTY(N'IsXTPSupported'), 0) AS bit) AS [IsXTPSupported],
+SERVERPROPERTY(N'ProductVersion') AS [VersionString],
+( select Value from #SVer where Name =N'host_platform') AS [HostPlatform],
+CAST(FULLTEXTSERVICEPROPERTY('IsFullTextInstalled') AS bit) AS [IsFullTextInstalled]
+ORDER BY
+[Server_Name] ASC
+
+        drop table #SVer
+      
+",0,9,9,0x15a5a5fbf4493bc5,0xe1c8c2368a0737d6,1
+"
+          create table #SVer(ID int,  Name  sysname, Internal_Value int, Value nvarchar(512))
+          insert #SVer exec master.dbo.xp_msver
+          insert #SVer select t.*
+          from sys.dm_os_host_info
+          CROSS APPLY (
+          VALUES
+          (1001, 'host_platform', 0, host_platform),
+          (1002, 'host_distribution', 0, host_distribution),
+          (1003, 'host_release', 0, host_release),
+          (1004, 'host_service_pack_level', 0, host_service_pack_level),
+          (1005, 'host_sku', host_sku, ''),
+          (1006, 'HardwareGeneration', '', ''),
+          (1007, 'ServiceTier', '', ''),
+          (1008, 'ReservedStorageSizeMB', '0', '0'),
+          (1009, 'UsedStorageSizeMB', '0', '0')
+          ) t(id, [name], internal_value, [value])
+
+          -- Managed Instance-specific properties
+          if (SERVERPROPERTY('EngineEdition') = 8)
+          begin
+            DECLARE @gen4memoryPerCoreMB float = 7168.0
+            DECLARE @gen5memoryPerCoreMB float = 5223.0
+            DECLARE @physicalMemory float
+            DECLARE @virtual_core_count int
+            DECLARE @reservedStorageSize bigint
+            DECLARE @usedStorageSize decimal(18,2)
+            DECLARE @hwGeneration nvarchar(128)
+            DECLARE @serviceTier nvarchar(128)
+
+            SET @physicalMemory = (SELECT TOP 1 [virtual_core_count] *
+              (
+                CASE WHEN [hardware_generation] = 'Gen4' THEN @gen4memoryPerCoreMB
+                WHEN [hardware_generation] = 'Gen5' THEN @gen5memoryPerCoreMB
+                ELSE 0 END
+               )
+               FROM master.sys.server_resource_stats 
+               ORDER BY start_time DESC)
+      
+            IF (@physicalMemory <> 0) 
+            BEGIN
+              UPDATE #SVer SET [Internal_Value] =  @physicalMemory WHERE Name = N'PhysicalMemory'
+              UPDATE #SVer SET [Value] = CONCAT( @physicalMemory, ' (',  @physicalMemory * 1024, ')') WHERE Name = N'PhysicalMemory'
+            END
+
+            UPDATE #SVer SET [Internal_Value] = (SELECT TOP 1 [virtual_core_count] FROM master.sys.server_resource_stats ORDER BY start_time desc) WHERE Name = N'ProcessorCount'
+            UPDATE #SVer SET [Value] = [Internal_Value] WHERE Name = N'ProcessorCount'
+
+            SELECT TOP 1
+              @hwGeneration = [hardware_generation],
+              @serviceTier =[sku],
+              @virtual_core_count = [virtual_core_count],
+              @reservedStorageSize = [reserved_storage_mb],
+              @usedStorageSize = [storage_space_used_mb]
+            FROM master.sys.server_resource_stats
+            ORDER BY [start_time] DESC
+
+            UPDATE #SVer SET [Value] = @hwGeneration WHERE Name = N'HardwareGeneration'
+            UPDATE #SVer SET [Value] = @serviceTier WHERE Name = N'ServiceTier'
+            UPDATE #SVer SET [Value] = @reservedStorageSize WHERE Name = N'ReservedStorageSizeMB'
+            UPDATE #SVer SET [Value] = @usedStorageSize WHERE Name = N'UsedStorageSizeMB'
+          end
+      
+
+
+SELECT
+CAST(
+        serverproperty(N'Servername')
+       AS sysname) AS [Server_Name],
+'Server[@Name=' + quotename(CAST(
+        serverproperty(N'Servername')
+       AS sysname),'''') + ']' AS [Server_Urn],
+CAST(null AS int) AS [Server_ServerType],
+0 AS [Server_IsContainedAuthentication],
+(@@microsoftversion / 0x1000000) & 0xff AS [VersionMajor],
+(@@microsoftversion / 0x10000) & 0xff AS [VersionMinor],
+@@microsoftversion & 0xffff AS [BuildNumber],
+CAST(SERVERPROPERTY('IsSingleUser') AS bit) AS [IsSingleUser],
+CAST(SERVERPROPERTY(N'Edition') AS sysname) AS [Edition],
+CAST(SERVERPROPERTY('EngineEdition') AS int) AS [EngineEdition],
+CAST(ISNULL(SERVERPROPERTY(N'IsXTPSupported'), 0) AS bit) AS [IsXTPSupported],
+SERVERPROPERTY(N'ProductVersion') AS [VersionString],
+( select Value from #SVer where Name =N'host_platform') AS [HostPlatform],
+CAST(FULLTEXTSERVICEPROPERTY('IsFullTextInstalled') AS bit) AS [IsFullTextInstalled]
+ORDER BY
+[Server_Name] ASC
+
+        drop table #SVer
+      
+",0,1,1,0x98b4e43cf37308b4,0x3e397a9a5e68e96c,1
+"
+          create table #SVer(ID int,  Name  sysname, Internal_Value int, Value nvarchar(512))
+          insert #SVer exec master.dbo.xp_msver
+          insert #SVer select t.*
+          from sys.dm_os_host_info
+          CROSS APPLY (
+          VALUES
+          (1001, 'host_platform', 0, host_platform),
+          (1002, 'host_distribution', 0, host_distribution),
+          (1003, 'host_release', 0, host_release),
+          (1004, 'host_service_pack_level', 0, host_service_pack_level),
+          (1005, 'host_sku', host_sku, ''),
+          (1006, 'HardwareGeneration', '', ''),
+          (1007, 'ServiceTier', '', ''),
+          (1008, 'ReservedStorageSizeMB', '0', '0'),
+          (1009, 'UsedStorageSizeMB', '0', '0')
+          ) t(id, [name], internal_value, [value])
+
+          -- Managed Instance-specific properties
+          if (SERVERPROPERTY('EngineEdition') = 8)
+          begin
+            DECLARE @gen4memoryPerCoreMB float = 7168.0
+            DECLARE @gen5memoryPerCoreMB float = 5223.0
+            DECLARE @physicalMemory float
+            DECLARE @virtual_core_count int
+            DECLARE @reservedStorageSize bigint
+            DECLARE @usedStorageSize decimal(18,2)
+            DECLARE @hwGeneration nvarchar(128)
+            DECLARE @serviceTier nvarchar(128)
+
+            SET @physicalMemory = (SELECT TOP 1 [virtual_core_count] *
+              (
+                CASE WHEN [hardware_generation] = 'Gen4' THEN @gen4memoryPerCoreMB
+                WHEN [hardware_generation] = 'Gen5' THEN @gen5memoryPerCoreMB
+                ELSE 0 END
+               )
+               FROM master.sys.server_resource_stats 
+               ORDER BY start_time DESC)
+      
+            IF (@physicalMemory <> 0) 
+            BEGIN
+              UPDATE #SVer SET [Internal_Value] =  @physicalMemory WHERE Name = N'PhysicalMemory'
+              UPDATE #SVer SET [Value] = CONCAT( @physicalMemory, ' (',  @physicalMemory * 1024, ')') WHERE Name = N'PhysicalMemory'
+            END
+
+            UPDATE #SVer SET [Internal_Value] = (SELECT TOP 1 [virtual_core_count] FROM master.sys.server_resource_stats ORDER BY start_time desc) WHERE Name = N'ProcessorCount'
+            UPDATE #SVer SET [Value] = [Internal_Value] WHERE Name = N'ProcessorCount'
+
+            SELECT TOP 1
+              @hwGeneration = [hardware_generation],
+              @serviceTier =[sku],
+              @virtual_core_count = [virtual_core_count],
+              @reservedStorageSize = [reserved_storage_mb],
+              @usedStorageSize = [storage_space_used_mb]
+            FROM master.sys.server_resource_stats
+            ORDER BY [start_time] DESC
+
+            UPDATE #SVer SET [Value] = @hwGeneration WHERE Name = N'HardwareGeneration'
+            UPDATE #SVer SET [Value] = @serviceTier WHERE Name = N'ServiceTier'
+            UPDATE #SVer SET [Value] = @reservedStorageSize WHERE Name = N'ReservedStorageSizeMB'
+            UPDATE #SVer SET [Value] = @usedStorageSize WHERE Name = N'UsedStorageSizeMB'
+          end
+      
+
+
+SELECT
+CAST(
+        serverproperty(N'Servername')
+       AS sysname) AS [Server_Name],
+'Server[@Name=' + quotename(CAST(
+        serverproperty(N'Servername')
+       AS sysname),'''') + ']' AS [Server_Urn],
+CAST(null AS int) AS [Server_ServerType],
+0 AS [Server_IsContainedAuthentication],
+(@@microsoftversion / 0x1000000) & 0xff AS [VersionMajor],
+(@@microsoftversion / 0x10000) & 0xff AS [VersionMinor],
+@@microsoftversion & 0xffff AS [BuildNumber],
+CAST(SERVERPROPERTY('IsSingleUser') AS bit) AS [IsSingleUser],
+CAST(SERVERPROPERTY(N'Edition') AS sysname) AS [Edition],
+CAST(SERVERPROPERTY('EngineEdition') AS int) AS [EngineEdition],
+CAST(ISNULL(SERVERPROPERTY(N'IsXTPSupported'), 0) AS bit) AS [IsXTPSupported],
+SERVERPROPERTY(N'ProductVersion') AS [VersionString],
+( select Value from #SVer where Name =N'host_platform') AS [HostPlatform],
+CAST(FULLTEXTSERVICEPROPERTY('IsFullTextInstalled') AS bit) AS [IsFullTextInstalled]
+ORDER BY
+[Server_Name] ASC
+
+        drop table #SVer
+      
+",0,20,20,0x91ac1d8b9ec8a55b,0xc2f2bb76e979ace9,1
+"IF (@@microsoftversion / 0x01000000) >= 9 AND ISNULL(IS_SRVROLEMEMBER(N'sysadmin'), 0) = 1
+            BEGIN
+                SELECT se.is_admin_endpoint AS N'AdminConnection',
+                	(SELECT CAST(cfg.value AS bit) AS [ConfigValue]
+                    		FROM
+                    		sys.configurations AS cfg WHERE configuration_id=16387)
+			        AS N'SmoEnabled'
+                FROM  sys.endpoints se
+                INNER JOIN sys.dm_exec_connections dmc ON dmc.endpoint_id = se.endpoint_id
+                                                                            WHERE
+                                                                            dmc.session_id = @@spid
+            END
+            ELSE
+            BEGIN
+		        IF (@@microsoftversion / 0x01000000) >= 9
+		        BEGIN
+                    SELECT CAST(0 AS BIT) AS N'AdminConnection',
+                        (SELECT CAST(cfg.value AS bit) AS [ConfigValue]
+	                            FROM
+	                            sys.configurations AS cfg WHERE configuration_id=16387)
+                    AS N'SmoEnabled'
+		        END
+		        ELSE
+		        BEGIN
+                    SELECT CAST(0 AS BIT) AS N'AdminConnection',
+                    CAST(0 AS BIT) AS N'SmoEnabled'
+		        END
+            END",0,1,1,0x1295483a51ebc1d9,0x832a1ff77108ece2,1
+"SELECT dtb.name AS [Name], dtb.state AS [State] FROM master.sys.databases dtb",0,5,5,0x40610eeefcb867e6,0xbfbafb7414842547,1

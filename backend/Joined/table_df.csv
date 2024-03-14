@@ -1,0 +1,14 @@
+TABLE_CATALOG,TABLE_SCHEMA,TABLE_NAME,TABLE_TYPE
+Northwind,dbo,Employees,BASE TABLE
+Northwind,dbo,Categories,BASE TABLE
+Northwind,dbo,Customers,BASE TABLE
+Northwind,dbo,Shippers,BASE TABLE
+Northwind,dbo,Suppliers,BASE TABLE
+Northwind,dbo,Orders,BASE TABLE
+Northwind,dbo,Products,BASE TABLE
+Northwind,dbo,Order Details,BASE TABLE
+Northwind,dbo,CustomerCustomerDemo,BASE TABLE
+Northwind,dbo,CustomerDemographics,BASE TABLE
+Northwind,dbo,Region,BASE TABLE
+Northwind,dbo,Territories,BASE TABLE
+Northwind,dbo,EmployeeTerritories,BASE TABLE

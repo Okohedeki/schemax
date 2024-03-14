@@ -1,0 +1,60 @@
+get_all_columns_tables:
+  query: |
+    SELECT *
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_NAME = :table_name  
+
+
+get_all_triggers: 
+  query: |
+    SELECT
+        t.name AS TableName,
+        tr.name AS TriggerName,
+        tr.type_desc,
+        tr.create_date,
+        tr.modify_date,
+        OBJECT_DEFINITION(tr.object_id) AS TriggerDefinition
+    FROM
+        sys.triggers AS tr
+    INNER JOIN
+        sys.tables AS t ON tr.parent_id = t.object_id
+    WHERE
+        t.name = :table_name 
+    ORDER BY
+        tr.name;
+
+get_all_indexes:
+  query: | 
+    SELECT
+        t.name AS TableName,
+        i.name AS IndexName,
+        i.type_desc AS IndexType,
+        i.is_primary_key AS IsPrimaryKey,
+        i.is_unique AS IsUnique,
+        i.is_unique_constraint AS IsUniqueConstraint,
+        COLUMN_NAME = STRING_AGG(c.name, ', ') WITHIN GROUP (ORDER BY ic.index_column_id),
+        i.is_disabled AS IsDisabled
+    FROM 
+        sys.indexes AS i
+    JOIN 
+        sys.tables AS t ON i.object_id = t.object_id
+    JOIN 
+        sys.index_columns AS ic ON ic.object_id = t.object_id AND ic.index_id = i.index_id
+    JOIN 
+        sys.columns AS c ON c.object_id = t.object_id AND c.column_id = ic.column_id
+    WHERE 
+        t.name = :table_name
+        AND i.type IN (1, 2) 
+    GROUP BY 
+        t.name,
+        i.name,
+        i.type_desc,
+        i.is_primary_key,
+        i.is_unique,
+        i.is_unique_constraint,
+        i.fill_factor,
+        i.is_disabled
+    ORDER BY 
+        i.name;
+
+

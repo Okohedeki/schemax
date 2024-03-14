@@ -1,0 +1,19 @@
+get_all_view_columns:
+  query: |
+    SELECT
+      v.name AS VIEW_NAME,
+      c.name AS ColumnName,
+      t.name AS DataType,
+      c.max_length AS MaxLength,
+      c.precision AS Precision,
+      c.scale AS Scale,
+      c.is_nullable AS IsNullable,
+      c.is_identity AS IsIdentity
+    FROM 
+      sys.columns AS c
+    JOIN 
+      sys.views AS v ON c.object_id = v.object_id
+    JOIN 
+      sys.types AS t ON c.system_type_id = t.system_type_id
+    WHERE 
+      v.name = :view_name

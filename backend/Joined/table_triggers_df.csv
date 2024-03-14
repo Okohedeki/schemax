@@ -1,0 +1,17 @@
+TABLE_NAME,TriggerName,type_desc,create_date,modify_date,TriggerDefinition
+Employees,trg_TestNoOp,SQL_TRIGGER,2024-03-10 23:10:45.747,2024-03-10 23:10:45.747,"CREATE TRIGGER trg_TestNoOp
+ON employees
+AFTER INSERT
+AS
+BEGIN
+    select 1
+END;"
+Employees,trgAfterInsert,SQL_TRIGGER,2024-02-28 11:00:56.783,2024-02-28 11:00:56.783,"
+CREATE TRIGGER trgAfterInsert
+ON Employees
+AFTER INSERT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    PRINT 'Hello';
+END;"

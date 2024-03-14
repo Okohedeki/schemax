@@ -1,0 +1,15 @@
+get_query_xml:
+  query: |
+    SELECT 
+      deqs.query_plan_hash, 
+      deqs.creation_time AS ExecutionTime,
+      dest.text AS QueryText,
+      deqp.query_plan AS QueryPlan
+    FROM 
+      sys.dm_exec_query_stats AS deqs
+    CROSS APPLY 
+      sys.dm_exec_text_query_plan(deqs.plan_handle, deqs.statement_start_offset, deqs.statement_end_offset) AS deqp
+    CROSS APPLY 
+      sys.dm_exec_sql_text(deqs.sql_handle) AS dest
+    WHERE 
+      deqs.query_plan_hash = CONVERT(VARBINARY(8),:query_hash);
