@@ -23,6 +23,8 @@ class DatabaseSchemaCollector:
         constraints_df = general_query_dict.get('get_all_constraints_keys')
         views_df = general_query_dict.get('get_all_views')
         recent_queries_df = general_query_dict.get('get_recent_queries')
+        stored_procedure_df = general_query_dict.get('get_all_stored_procedures')
+        functions_df = general_query_dict.get('get_all_functions')
 
         # Load table queries
         yaml_file_table = 'SQLQueriesTable.yml'
@@ -64,6 +66,8 @@ class DatabaseSchemaCollector:
             'table_indexes_df': table_indexes_df,
             'view_df': view_df,
             'hash_df': hash_df,
+            'stored_procedure_df':stored_procedure_df,
+            'functions_df':functions_df
         }
 
     def manipulate_dataframes(self, result_dict):
@@ -94,6 +98,8 @@ class DatabaseSchemaCollector:
             table_indexes_df = result_dict.get('table_indexes_df')
             view_df = result_dict.get('view_df')
             hash_df = result_dict.get('hash_df')
+            stored_procedure_df = result_dict.get('stored_procedure_df')
+            functions_df = result_dict.get('functions_df')
 
             try:
                 # Perform left join
@@ -105,7 +111,7 @@ class DatabaseSchemaCollector:
                 view_join_df = views_df.merge(view_df, how='left', on='VIEW_NAME')
                 hash_join_df = recent_queries_df.merge(hash_df, how='left', on='query_plan_hash')
 
-                return {'table_joins_df':table_index_join_df, 'view_joins_df':view_join_df, 'hash_joins_df':hash_join_df}
+                return {'table_joins_df':table_index_join_df, 'view_joins_df':view_join_df, 'hash_joins_df':hash_join_df, 'stored_procedure_df':stored_procedure_df, 'functions_df':functions_df}
             except Exception as e:
                 print(f"Error during left join operation: {e}")
                 return None
@@ -119,4 +125,6 @@ if __name__ == "__main__":
 
     cleaned_dataframes = schema_collector.manipulate_dataframes(schema_data)
     data = schema_collector.join_tables(cleaned_dataframes)
-    print(data)
+    for key, value  in data.items():
+        if key in ('stored_procedure_df'):
+            value.to_csv(str(key) + '.csv')

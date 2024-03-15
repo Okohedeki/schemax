@@ -1,0 +1,73 @@
+,ProcedureName,CreationDate,LastModifiedDate,ProcedureText
+0,CustOrderHist,2022-11-08 21:34:27.107,2022-11-08 21:34:27.107,"CREATE PROCEDURE CustOrderHist @CustomerID nchar(5)
+AS
+SELECT ProductName, Total=SUM(Quantity)
+FROM Products P, [Order Details] OD, Orders O, Customers C
+WHERE C.CustomerID = @CustomerID
+AND C.CustomerID = O.CustomerID AND O.OrderID = OD.OrderID AND OD.ProductID = P.ProductID
+GROUP BY ProductName
+"
+1,CustOrdersDetail,2022-11-08 21:34:27.093,2022-11-08 21:34:27.093,"
+CREATE PROCEDURE CustOrdersDetail @OrderID int
+AS
+SELECT ProductName,
+    UnitPrice=ROUND(Od.UnitPrice, 2),
+    Quantity,
+    Discount=CONVERT(int, Discount * 100), 
+    ExtendedPrice=ROUND(CONVERT(money, Quantity * (1 - Discount) * Od.UnitPrice), 2)
+FROM Products P, [Order Details] Od
+WHERE Od.ProductID = P.ProductID and Od.OrderID = @OrderID
+"
+2,CustOrdersOrders,2022-11-08 21:34:27.100,2022-11-08 21:34:27.100,"
+CREATE PROCEDURE CustOrdersOrders @CustomerID nchar(5)
+AS
+SELECT OrderID, 
+	OrderDate,
+	RequiredDate,
+	ShippedDate
+FROM Orders
+WHERE CustomerID = @CustomerID
+ORDER BY OrderID
+"
+3,Employee Sales by Country,2022-11-08 21:34:26.223,2022-11-08 21:34:26.223,"
+create procedure ""Employee Sales by Country"" 
+@Beginning_Date DateTime, @Ending_Date DateTime AS
+SELECT Employees.Country, Employees.LastName, Employees.FirstName, Orders.ShippedDate, Orders.OrderID, ""Order Subtotals"".Subtotal AS SaleAmount
+FROM Employees INNER JOIN 
+	(Orders INNER JOIN ""Order Subtotals"" ON Orders.OrderID = ""Order Subtotals"".OrderID) 
+	ON Employees.EmployeeID = Orders.EmployeeID
+WHERE Orders.ShippedDate Between @Beginning_Date And @Ending_Date
+"
+4,Sales by Year,2022-11-08 21:34:26.223,2022-11-08 21:34:26.223,"
+create procedure ""Sales by Year"" 
+	@Beginning_Date DateTime, @Ending_Date DateTime AS
+SELECT Orders.ShippedDate, Orders.OrderID, ""Order Subtotals"".Subtotal, DATENAME(yy,ShippedDate) AS Year
+FROM Orders INNER JOIN ""Order Subtotals"" ON Orders.OrderID = ""Order Subtotals"".OrderID
+WHERE Orders.ShippedDate Between @Beginning_Date And @Ending_Date
+"
+5,SalesByCategory,2022-11-08 21:34:27.113,2022-11-08 21:34:27.113,"CREATE PROCEDURE SalesByCategory
+    @CategoryName nvarchar(15), @OrdYear nvarchar(4) = '1998'
+AS
+IF @OrdYear != '1996' AND @OrdYear != '1997' AND @OrdYear != '1998' 
+BEGIN
+	SELECT @OrdYear = '1998'
+END
+
+SELECT ProductName,
+	TotalPurchase=ROUND(SUM(CONVERT(decimal(14,2), OD.Quantity * (1-OD.Discount) * OD.UnitPrice)), 0)
+FROM [Order Details] OD, Orders O, Products P, Categories C
+WHERE OD.OrderID = O.OrderID 
+	AND OD.ProductID = P.ProductID 
+	AND P.CategoryID = C.CategoryID
+	AND C.CategoryName = @CategoryName
+	AND SUBSTRING(CONVERT(nvarchar(22), O.OrderDate, 111), 1, 4) = @OrdYear
+GROUP BY ProductName
+ORDER BY ProductName
+"
+6,Ten Most Expensive Products,2022-11-08 21:34:26.220,2022-11-08 21:34:26.220,"
+create procedure ""Ten Most Expensive Products"" AS
+SET ROWCOUNT 10
+SELECT Products.ProductName AS TenMostExpensiveProducts, Products.UnitPrice
+FROM Products
+ORDER BY Products.UnitPrice DESC
+"
