@@ -1,4 +1,5 @@
 from GetSchemaData import DatabaseConnector
+from ParseStoredProcedures import SQLParser
 import warnings
 import os
 
@@ -14,6 +15,8 @@ class DatabaseSchemaCollector:
         self.db_connector = DatabaseConnector(self.server, self.database)
         self.db_connector.connect()
 
+        sql_parser = SQLParser()
+
         # Load general queries
         yaml_file_general = 'SQLQueriesGeneral.yml'
         self.db_connector.load_queries_from_yaml(yaml_file_general)
@@ -25,6 +28,8 @@ class DatabaseSchemaCollector:
         recent_queries_df = general_query_dict.get('get_recent_queries')
         stored_procedure_df = general_query_dict.get('get_all_stored_procedures')
         functions_df = general_query_dict.get('get_all_functions')
+
+        stored_procedure_table_joins = sql_parser.parse_table_references(stored_procedure_df)
 
         # Load table queries
         yaml_file_table = 'SQLQueriesTable.yml'
@@ -67,7 +72,8 @@ class DatabaseSchemaCollector:
             'view_df': view_df,
             'hash_df': hash_df,
             'stored_procedure_df':stored_procedure_df,
-            'functions_df':functions_df
+            'functions_df':functions_df,
+            'stored_procedure_table_joins':stored_procedure_table_joins
         }
 
     def manipulate_dataframes(self, result_dict):
@@ -100,6 +106,7 @@ class DatabaseSchemaCollector:
             hash_df = result_dict.get('hash_df')
             stored_procedure_df = result_dict.get('stored_procedure_df')
             functions_df = result_dict.get('functions_df')
+            stored_procedure_table_joins = result_dict.get('stored_procedure_table_joins')
 
             try:
                 # Perform left join
@@ -107,6 +114,8 @@ class DatabaseSchemaCollector:
                 table_index_join_df = table_index_join_df.merge(table_columns_df, how='left', on='TABLE_NAME')
                 table_index_join_df = table_index_join_df.merge(table_indexes_df, how='left', on='TABLE_NAME')
                 table_index_join_df = table_index_join_df.merge(constraints_df, how='left', on='TABLE_NAME')
+                table_index_join_df = table_index_join_df.merge(stored_procedure_table_joins, how='left', on='TABLE_NAME')
+
 
                 view_join_df = views_df.merge(view_df, how='left', on='VIEW_NAME')
                 hash_join_df = recent_queries_df.merge(hash_df, how='left', on='query_plan_hash')
@@ -126,5 +135,4 @@ if __name__ == "__main__":
     cleaned_dataframes = schema_collector.manipulate_dataframes(schema_data)
     data = schema_collector.join_tables(cleaned_dataframes)
     for key, value  in data.items():
-        if key in ('stored_procedure_df'):
-            value.to_csv(str(key) + '.csv')
+        value.to_csv(str(key) + '.csv')

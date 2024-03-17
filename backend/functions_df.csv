@@ -1,0 +1,36 @@
+,FunctionName,CreationDate,LastModifiedDate,FunctionText
+0,AddIntegers,2024-03-10 23:50:31.880,2024-03-10 23:50:31.880,"CREATE FUNCTION dbo.AddIntegers (@a INT, @b INT)
+RETURNS INT
+AS
+BEGIN
+    RETURN @a + @b;
+END;"
+1,GetOrdersForCustomer,2024-03-10 23:51:02.307,2024-03-10 23:51:02.307,"	CREATE FUNCTION dbo.GetOrdersForCustomer (@customerId INT)
+RETURNS TABLE
+AS
+RETURN
+(
+    SELECT OrderID, OrderDate
+    FROM Orders
+    WHERE CustomerID = @customerId
+);"
+2,SplitString,2024-03-10 23:51:14.020,2024-03-10 23:51:14.020,"	CREATE FUNCTION dbo.SplitString (@inputString NVARCHAR(MAX))
+RETURNS @outputTable TABLE (Value NVARCHAR(MAX))
+AS
+BEGIN
+    DECLARE @pos INT, @nextPos INT, @len INT
+    SET @pos = 1
+    SET @nextPos = 1
+    SET @len = LEN(@inputString)
+
+    WHILE @pos <= @len
+    BEGIN
+        SET @nextPos = CHARINDEX(',', @inputString, @pos)
+        IF @nextPos = 0
+            SET @nextPos = @len + 1
+        INSERT INTO @outputTable (Value) VALUES (SUBSTRING(@inputString, @pos, @nextPos - @pos))
+        SET @pos = @nextPos + 1
+    END
+
+    RETURN;
+END;"

@@ -1,27 +1,16 @@
-from DataFrameJoiner import DatabaseSchemaCollector
 import pandas as pd
 import re
+from Utils import Utils
 
 class SQLParser:
-    def __init__(self, server, database):
-        # Initialize DatabaseSchemaCollector
-        self.schema_collector = DatabaseSchemaCollector(server, database)
+    def __init__(self):
+        pass
     
-    def parse_table_references(self):
-        # Fetch schema data
-        schema_data = self.schema_collector.fetch_schema_data()
-        
-        # Assuming 'fetch_schema_data' returns a dictionary of DataFrames, including 'stored_procedure_df'
-        stored_procedure_df = schema_data.get('stored_procedure_df') 
-
+    def parse_table_references(self, stored_procedure_df):
+        rows = []
         for index, row in stored_procedure_df.iterrows():
             query = row['ProcedureText']
-            print(query)
             query = ' '.join(query.splitlines())
-            print(query)
-            real_tables = []
-            hash_tables = []
-            global_temp_tables = []
 
             # Extract table names from the FROM clause
             from_clause = re.search(r'FROM\s*(.*?)(?=WHERE|GROUP BY|ORDER BY|HAVING|$)', query, re.IGNORECASE)
@@ -29,38 +18,32 @@ class SQLParser:
                 tables = from_clause.group(1).split(',')
                 for table in tables:
                     table = table.strip()
-                    if table.startswith('#'):
-                        if table.startswith('##'):
-                            global_temp_tables.append(table[2:])
-                        else:
-                            hash_tables.append(table[1:])
-                    else:
-                        real_tables.append(table)
-            else:
-                print('Not Found')
+                    table = Utils.remove_before_first_space(table)
+                    table = Utils.replace_non_alphanumeric(table)
+                    rows.append([row['ProcedureName'], table])
 
             # Extract table names from the JOIN clauses
             join_tables = re.findall(r'JOIN\s*(\S+)', query, re.IGNORECASE)
             for table in join_tables:
                 table = table.strip()
-                if table.startswith('#'):
-                    if table.startswith('##'):
-                        global_temp_tables.append(table[2:])
-                    else:
-                        hash_tables.append(table[1:])
-                else:
-                    real_tables.append(table)
+                table = Utils.replace_non_alphanumeric(table)
+                rows.append([row['ProcedureName'], table])
 
-            return [real_tables, hash_tables, global_temp_tables]
+        # Create a DataFrame from the collected data
+        result_df = pd.DataFrame(rows, columns=['ProcedureName', 'TABLE_NAME'])
+        return result_df
 
 
 if __name__ == "__main__":
     server = 'DESKTOP-1OCA8OH\\SQLEXPRESS'
     database = 'northwind'
     
-    # Initialize SQLParser with server and database
-    sql_parser = SQLParser(server, database)
+    # Create an instance of SQLParser
+    sql_parser = SQLParser()
     
-    # Fetch and print the top row of the stored_procedure_df
-    tables  = sql_parser.parse_table_references()
+    # Fetch the stored_procedure_df (assuming it's already loaded into a DataFrame)
+    stored_procedure_df = ...  # Replace ... with the actual DataFrame
+    
+    # Parse table references and print the result
+    tables = sql_parser.parse_table_references(stored_procedure_df)
     print(tables)
