@@ -1,0 +1,44 @@
+import React from 'react';
+import ReactFlow from 'reactflow';
+
+import 'reactflow/dist/style.css';
+
+const initialNodes = [{ 'id': 'Employees',  'data': { 'label': 'Employees' }, 'position': { 'x': 0, 'y': 0 } },
+{ 'id': 'Categories',  'data': { 'label': 'Categories' }, 'position': { 'x': 0, 'y': 0 } },
+{ 'id': 'Customers',  'data': { 'label': 'Customers' }, 'position': { 'x': 0, 'y': 0 } },
+{ 'id': 'Shippers',  'data': { 'label': 'Shippers' }, 'position': { 'x': 0, 'y': 0 } },
+{ 'id': 'Suppliers',  'data': { 'label': 'Suppliers' }, 'position': { 'x': 0, 'y': 0 } },
+{ 'id': 'Orders',  'data': { 'label': 'Orders' }, 'position': { 'x': 0, 'y': 0 } },
+{ 'id': 'Products',  'data': { 'label': 'Products' }, 'position': { 'x': 0, 'y': 0 } },
+{ 'id': 'Order Details',  'data': { 'label': 'Order Details' }, 'position': { 'x': 0, 'y': 0 } },
+{ 'id': 'CustomerCustomerDemo',  'data': { 'label': 'CustomerCustomerDemo' }, 'position': { 'x': 0, 'y': 0 } },
+{ 'id': 'CustomerDemographics',  'data': { 'label': 'CustomerDemographics' }, 'position': { 'x': 0, 'y': 0 } },
+{ 'id': 'Region',  'data': { 'label': 'Region' }, 'position': { 'x': 0, 'y': 0 } },
+{ 'id': 'Territories',  'data': { 'label': 'Territories' }, 'position': { 'x': 0, 'y': 0 } },
+{ 'id': 'EmployeeTerritories',  'data': { 'label': 'EmployeeTerritories' }, 'position': { 'x': 0, 'y': 0 } },
+{ 'id': 'trigger_trg_TestNoOp',  'data': { 'label': 'trg_TestNoOp' }, 'position': { 'x': 0, 'y': 0 } },
+{ 'id': 'trigger_trgAfterInsert',  'data': { 'label': 'trgAfterInsert' }, 'position': { 'x': 0, 'y': 0 } },
+{ 'id': 'trigger_nan',  'data': { 'label': 'nan' }, 'position': { 'x': 0, 'y': 0 } }];
+
+const initialEdges = [{ 'id': 'Employees_trg_TestNoOp', 'source': 'Employees', 'target': 'trigger_trg_TestNoOp', 'data': { 'label': '' } },
+{ 'id': 'Employees_trgAfterInsert', 'source': 'Employees', 'target': 'trigger_trgAfterInsert', 'data': { 'label': '' } },
+{ 'id': 'Categories_nan', 'source': 'Categories', 'target': 'trigger_nan', 'data': { 'label': '' } },
+{ 'id': 'Customers_nan', 'source': 'Customers', 'target': 'trigger_nan', 'data': { 'label': '' } },
+{ 'id': 'Shippers_nan', 'source': 'Shippers', 'target': 'trigger_nan', 'data': { 'label': '' } },
+{ 'id': 'Suppliers_nan', 'source': 'Suppliers', 'target': 'trigger_nan', 'data': { 'label': '' } },
+{ 'id': 'Orders_nan', 'source': 'Orders', 'target': 'trigger_nan', 'data': { 'label': '' } },
+{ 'id': 'Products_nan', 'source': 'Products', 'target': 'trigger_nan', 'data': { 'label': '' } },
+{ 'id': 'Order Details_nan', 'source': 'Order Details', 'target': 'trigger_nan', 'data': { 'label': '' } },
+{ 'id': 'CustomerCustomerDemo_nan', 'source': 'CustomerCustomerDemo', 'target': 'trigger_nan', 'data': { 'label': '' } },
+{ 'id': 'CustomerDemographics_nan', 'source': 'CustomerDemographics', 'target': 'trigger_nan', 'data': { 'label': '' } },
+{ 'id': 'Region_nan', 'source': 'Region', 'target': 'trigger_nan', 'data': { 'label': '' } },
+{ 'id': 'Territories_nan', 'source': 'Territories', 'target': 'trigger_nan', 'data': { 'label': '' } },
+{ 'id': 'EmployeeTerritories_nan', 'source': 'EmployeeTerritories', 'target': 'trigger_nan', 'data': { 'label': '' } }];
+
+export default function App() {
+  return (
+    <div style={{ width: '100vw', height: '100vh' }}>
+      <ReactFlow nodes={initialNodes} edges={initialEdges} />
+    </div>
+  );
+}
