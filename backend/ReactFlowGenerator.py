@@ -6,6 +6,7 @@ class ReactFlowNodeGenerator:
         self.table_index_join_df = table_index_join_df
 
     def generate_node_edges_tablename_triggers(self):
+        self.table_index_join_df.fillna('None', inplace=True)
         # Get unique connections between TABLE_NAME and TriggerName
         unique_connections = self.table_index_join_df[['TABLE_NAME', 'TriggerName']].drop_duplicates()
 
@@ -15,9 +16,7 @@ class ReactFlowNodeGenerator:
             nodes.append({
                 'id': table_name,
                 'type': 'table_node',  # Define type for table nodes
-                'data': {'label': table_name},  # Label is set to the TABLE_NAME
-                'position': {'x': 0, 'y': 0},  # Initial position of the node
-            })
+                'data': {'label': table_name}            })
 
         # Generate nodes for Triggers
         trigger_nodes = []
@@ -25,9 +24,7 @@ class ReactFlowNodeGenerator:
             trigger_nodes.append({
                 'id': f'trigger_{trigger_name}',
                 'type': 'trigger_node',  # Define type for trigger nodes
-                'data': {'label': trigger_name},  # Label is set to the TriggerName
-                'position': {'x': 0, 'y': 0},  # Initial position of the node
-            })
+                'data': {'label': trigger_name}            })
 
         nodes.extend(trigger_nodes)
 

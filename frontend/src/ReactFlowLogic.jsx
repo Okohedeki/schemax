@@ -9,7 +9,7 @@ import dagre from 'dagre';
 
 import 'reactflow/dist/style.css';
 
-function App() {
+const ReactFlowLayout = ({ initialNodes, initialEdges }) => {
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
 
@@ -118,4 +118,4 @@ function App() {
   );
 }
 
-export default App;
+export default ReactFlowLayout;

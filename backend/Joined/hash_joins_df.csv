@@ -158,12 +158,229 @@ as
 
     order by 2, 12, 11, 20
 ",1,1,3,b'L\xe7\xab\x99\x11\xf5\xc4 ',b'\x98\xa6 \xf1\x16$25',4,,,
-6,"SELECT target_data
-									FROM sys.dm_xe_session_targets xet WITH(nolock)
-									JOIN sys.dm_xe_sessions xes WITH(nolock)
-									ON xes.address = xet.event_session_address
-									WHERE xes.name = 'telemetry_xevents'
-									AND xet.target_name = 'ring_buffer'",2,1,1,b'R\xb3\xb6\xce\xdeo\xc5z',b'\x99\xe4 9\xe9(\xe3\xd9',159,,,
+6,"if exists(select * from sys.server_event_sessions where name='telemetry_xevents')
+	drop event session telemetry_xevents on server
+
+create event session telemetry_xevents on server
+ ADD EVENT [sqlserver].[error_reported]
+(
+WHERE severity >= 16
+or (error_number = 18456
+    or error_number = 17803 or error_number = 701 or error_number = 802 or error_number = 8645 or error_number = 8651
+    or error_number = 8657 or error_number = 8902 or error_number = 41354 or error_number = 41355 or error_number = 41367
+    or error_number = 41384 or error_number = 41336 or error_number = 41309 or error_number = 41312 or error_number = 41313
+    or error_number = 33065 or error_number = 33066)
+),
+
+ ADD EVENT [sqlserver].[missing_column_statistics],
+
+ ADD EVENT [sqlserver].[missing_join_predicate],
+
+ ADD EVENT [sqlserver].[server_memory_change],
+
+ ADD EVENT [sqlserver].[stretch_database_disable_completed],
+
+ ADD EVENT [sqlserver].[stretch_database_enable_completed],
+
+ ADD EVENT [sqlserver].[stretch_database_reauthorize_completed],
+
+ ADD EVENT [sqlserver].[stretch_index_reconciliation_codegen_completed],
+
+ ADD EVENT [sqlserver].[stretch_remote_column_execution_completed],
+
+ ADD EVENT [sqlserver].[stretch_remote_column_reconciliation_codegen_completed],
+
+ ADD EVENT [sqlserver].[stretch_remote_index_execution_completed],
+
+ ADD EVENT [sqlserver].[stretch_table_codegen_completed],
+
+ ADD EVENT [sqlserver].[stretch_table_alter_ddl],
+
+ ADD EVENT [sqlserver].[stretch_table_create_ddl],
+
+ ADD EVENT [sqlserver].[stretch_table_predicate_not_specified],
+
+ ADD EVENT [sqlserver].[stretch_table_predicate_specified],
+
+ ADD EVENT [sqlserver].[stretch_table_remote_creation_completed],
+
+ ADD EVENT [sqlserver].[stretch_table_row_migration_results_event],
+
+ ADD EVENT [sqlserver].[stretch_table_row_unmigration_results_event],
+
+ ADD EVENT [sqlserver].[stretch_table_data_reconciliation_results_event],
+
+ ADD EVENT [sqlserver].[stretch_table_unprovision_completed],
+
+ ADD EVENT [sqlserver].[stretch_table_validation_error],
+
+ ADD EVENT [sqlserver].[stretch_table_hinted_admin_update_event],
+
+ ADD EVENT [sqlserver].[stretch_table_hinted_admin_delete_event],
+
+ ADD EVENT [sqlserver].[stretch_table_query_error],
+
+ ADD EVENT [sqlserver].[stretch_remote_error],
+
+ ADD EVENT [sqlserver].[stretch_query_telemetry],
+
+ ADD EVENT [sqlserver].[temporal_ddl_system_versioning],
+
+ ADD EVENT [sqlserver].[temporal_dml_transaction_fail],
+
+ ADD EVENT [sqlserver].[temporal_ddl_period_add],
+
+ ADD EVENT [sqlserver].[temporal_ddl_period_drop],
+
+ ADD EVENT [sqlserver].[temporal_ddl_schema_check_fail],
+
+ ADD EVENT [sqlserver].[data_masking_ddl_column_definition],
+
+ ADD EVENT [sqlserver].[data_masking_traffic],
+
+ ADD EVENT [sqlserver].[data_masking_traffic_masked_only],
+
+ ADD EVENT [sqlserver].[data_classification_ddl_column_definition],
+
+ ADD EVENT [sqlserver].[data_classification_traffic],
+
+ ADD EVENT [sqlserver].[data_classification_auditing_traffic],
+
+ ADD EVENT [sqlserver].[feature_restriction_ddl],
+
+ ADD EVENT [sqlserver].[feature_restriction_usage],
+
+ ADD EVENT [sqlserver].[always_encrypted_query_count],
+
+ ADD EVENT [sqlserver].[rls_query_count],
+
+ ADD EVENT [sqlserver].[auto_stats],
+
+ ADD EVENT [sqlserver].[database_cmptlevel_change],
+
+ ADD EVENT [sqlserver].[database_created],
+
+ ADD EVENT [sqlserver].[database_dropped],
+
+ ADD EVENT [sqlserver].[reason_many_foreign_keys_operator_not_used],
+
+ ADD EVENT [sqlserver].[interleaved_exec_status],
+
+ ADD EVENT [sqlserver].[table_variable_deferred_compilation],
+
+ ADD EVENT [sqlserver].[graph_match_query_compiled],
+
+ ADD EVENT [sqlserver].[approximate_count_distinct_query_compiled],
+
+ ADD EVENT [sqlserver].[login_protocol_count],
+
+ ADD EVENT [sqlserver].[column_store_index_build_low_memory],
+
+ ADD EVENT [sqlserver].[column_store_index_build_throttle],
+
+ ADD EVENT [sqlserver].[columnstore_delete_buffer_flush_failed],
+
+ ADD EVENT [sqlserver].[columnstore_delta_rowgroup_closed],
+
+ ADD EVENT [sqlserver].[columnstore_index_reorg_failed],
+
+ ADD EVENT [sqlserver].[columnstore_log_exception],
+
+ ADD EVENT [sqlserver].[columnstore_rowgroup_merge_failed],
+
+ ADD EVENT [sqlserver].[columnstore_tuple_mover_delete_buffer_truncate_timed_out],
+
+ ADD EVENT [sqlserver].[columnstore_tuple_mover_end_compress],
+
+ ADD EVENT [sqlserver].[query_memory_grant_blocking],
+
+ ADD EVENT [sqlserver].[natively_compiled_module_inefficiency_detected],
+
+ ADD EVENT [sqlserver].[natively_compiled_proc_slow_parameter_passing],
+
+ ADD EVENT [sqlserver].[xtp_alter_table],
+
+ ADD EVENT [sqlserver].[xtp_db_delete_only_mode_updatedhktrimlsn],
+
+ ADD EVENT [sqlserver].[xtp_stgif_container_added],
+
+ ADD EVENT [sqlserver].[xtp_stgif_container_deleted],
+
+ ADD EVENT [xtpcompile].[cl_duration],
+
+ ADD EVENT [xtpengine].[xtp_physical_db_restarted],
+
+ ADD EVENT [xtpengine].[xtp_db_delete_only_mode_enter],
+
+ ADD EVENT [xtpengine].[xtp_db_delete_only_mode_update],
+
+ ADD EVENT [xtpengine].[xtp_db_delete_only_mode_exit],
+
+ ADD EVENT [xtpengine].[parallel_alter_stats],
+
+ ADD EVENT [xtpengine].[serial_alter_stats],
+
+ ADD EVENT [sqlserver].[json_function_compiled]
+(
+ACTION ([database_id])
+),
+
+ ADD EVENT [sqlserver].[string_escape_compiled]
+(
+ACTION ([database_id])
+),
+
+ ADD EVENT [sqlserver].[window_function_used]
+(
+ACTION ([database_id])
+),
+
+ ADD EVENT [sqlserver].[sequence_function_used]
+(
+ACTION ([database_id])
+),
+
+ ADD EVENT [qds].[query_store_db_diagnostics],
+
+ ADD EVENT [sqlserver].[index_defragmentation],
+
+ ADD EVENT [sqlserver].[create_index_event],
+
+ ADD EVENT [sqlserver].[index_build_error_event],
+
+ ADD EVENT [sqlserver].[alter_column_event],
+
+ ADD EVENT [sqlserver].[cardinality_estimation_version_usage],
+
+ ADD EVENT [sqlserver].[query_optimizer_compatibility_level_hint_usage],
+
+ ADD EVENT [sqlserver].[query_tsql_scalar_udf_inlined],
+
+ ADD EVENT [sqlserver].[tsql_scalar_udf_not_inlineable],
+
+ ADD EVENT [sqlserver].[recovery_checkpoint_stats],
+
+ ADD EVENT [sqlserver].[multistep_execution]
+(
+ACTION ([database_id])
+),
+
+ ADD EVENT [sqlserver].[fulltext_filter_usage],
+
+ ADD EVENT [sqlserver].[tx_commit_abort_stats],
+
+ ADD EVENT [sqlserver].[server_start_stop]
+add target package0.ring_buffer
+(set occurrence_number = 100)
+with
+(
+	MAX_DISPATCH_LATENCY = 120 SECONDS,
+	MAX_MEMORY = 4 MB,
+	startup_state = on
+)
+if not exists (select * from sys.dm_xe_sessions where name = 'telemetry_xevents')
+	alter event session telemetry_xevents on server state=start
+",0,0,0,b'\x19\x92/\x19n\x11hO',b'\xc9\x919Km\xc1\xcf\x85',4,,,
 7,"if exists(select * from sys.server_event_sessions where name='telemetry_xevents')
 	drop event session telemetry_xevents on server
 
@@ -386,230 +603,13 @@ with
 )
 if not exists (select * from sys.dm_xe_sessions where name = 'telemetry_xevents')
 	alter event session telemetry_xevents on server state=start
-",0,0,0,b'\x19\x92/\x19n\x11hO',b'\xc9\x919Km\xc1\xcf\x85',15,,,
-8,"if exists(select * from sys.server_event_sessions where name='telemetry_xevents')
-	drop event session telemetry_xevents on server
-
-create event session telemetry_xevents on server
- ADD EVENT [sqlserver].[error_reported]
-(
-WHERE severity >= 16
-or (error_number = 18456
-    or error_number = 17803 or error_number = 701 or error_number = 802 or error_number = 8645 or error_number = 8651
-    or error_number = 8657 or error_number = 8902 or error_number = 41354 or error_number = 41355 or error_number = 41367
-    or error_number = 41384 or error_number = 41336 or error_number = 41309 or error_number = 41312 or error_number = 41313
-    or error_number = 33065 or error_number = 33066)
-),
-
- ADD EVENT [sqlserver].[missing_column_statistics],
-
- ADD EVENT [sqlserver].[missing_join_predicate],
-
- ADD EVENT [sqlserver].[server_memory_change],
-
- ADD EVENT [sqlserver].[stretch_database_disable_completed],
-
- ADD EVENT [sqlserver].[stretch_database_enable_completed],
-
- ADD EVENT [sqlserver].[stretch_database_reauthorize_completed],
-
- ADD EVENT [sqlserver].[stretch_index_reconciliation_codegen_completed],
-
- ADD EVENT [sqlserver].[stretch_remote_column_execution_completed],
-
- ADD EVENT [sqlserver].[stretch_remote_column_reconciliation_codegen_completed],
-
- ADD EVENT [sqlserver].[stretch_remote_index_execution_completed],
-
- ADD EVENT [sqlserver].[stretch_table_codegen_completed],
-
- ADD EVENT [sqlserver].[stretch_table_alter_ddl],
-
- ADD EVENT [sqlserver].[stretch_table_create_ddl],
-
- ADD EVENT [sqlserver].[stretch_table_predicate_not_specified],
-
- ADD EVENT [sqlserver].[stretch_table_predicate_specified],
-
- ADD EVENT [sqlserver].[stretch_table_remote_creation_completed],
-
- ADD EVENT [sqlserver].[stretch_table_row_migration_results_event],
-
- ADD EVENT [sqlserver].[stretch_table_row_unmigration_results_event],
-
- ADD EVENT [sqlserver].[stretch_table_data_reconciliation_results_event],
-
- ADD EVENT [sqlserver].[stretch_table_unprovision_completed],
-
- ADD EVENT [sqlserver].[stretch_table_validation_error],
-
- ADD EVENT [sqlserver].[stretch_table_hinted_admin_update_event],
-
- ADD EVENT [sqlserver].[stretch_table_hinted_admin_delete_event],
-
- ADD EVENT [sqlserver].[stretch_table_query_error],
-
- ADD EVENT [sqlserver].[stretch_remote_error],
-
- ADD EVENT [sqlserver].[stretch_query_telemetry],
-
- ADD EVENT [sqlserver].[temporal_ddl_system_versioning],
-
- ADD EVENT [sqlserver].[temporal_dml_transaction_fail],
-
- ADD EVENT [sqlserver].[temporal_ddl_period_add],
-
- ADD EVENT [sqlserver].[temporal_ddl_period_drop],
-
- ADD EVENT [sqlserver].[temporal_ddl_schema_check_fail],
-
- ADD EVENT [sqlserver].[data_masking_ddl_column_definition],
-
- ADD EVENT [sqlserver].[data_masking_traffic],
-
- ADD EVENT [sqlserver].[data_masking_traffic_masked_only],
-
- ADD EVENT [sqlserver].[data_classification_ddl_column_definition],
-
- ADD EVENT [sqlserver].[data_classification_traffic],
-
- ADD EVENT [sqlserver].[data_classification_auditing_traffic],
-
- ADD EVENT [sqlserver].[feature_restriction_ddl],
-
- ADD EVENT [sqlserver].[feature_restriction_usage],
-
- ADD EVENT [sqlserver].[always_encrypted_query_count],
-
- ADD EVENT [sqlserver].[rls_query_count],
-
- ADD EVENT [sqlserver].[auto_stats],
-
- ADD EVENT [sqlserver].[database_cmptlevel_change],
-
- ADD EVENT [sqlserver].[database_created],
-
- ADD EVENT [sqlserver].[database_dropped],
-
- ADD EVENT [sqlserver].[reason_many_foreign_keys_operator_not_used],
-
- ADD EVENT [sqlserver].[interleaved_exec_status],
-
- ADD EVENT [sqlserver].[table_variable_deferred_compilation],
-
- ADD EVENT [sqlserver].[graph_match_query_compiled],
-
- ADD EVENT [sqlserver].[approximate_count_distinct_query_compiled],
-
- ADD EVENT [sqlserver].[login_protocol_count],
-
- ADD EVENT [sqlserver].[column_store_index_build_low_memory],
-
- ADD EVENT [sqlserver].[column_store_index_build_throttle],
-
- ADD EVENT [sqlserver].[columnstore_delete_buffer_flush_failed],
-
- ADD EVENT [sqlserver].[columnstore_delta_rowgroup_closed],
-
- ADD EVENT [sqlserver].[columnstore_index_reorg_failed],
-
- ADD EVENT [sqlserver].[columnstore_log_exception],
-
- ADD EVENT [sqlserver].[columnstore_rowgroup_merge_failed],
-
- ADD EVENT [sqlserver].[columnstore_tuple_mover_delete_buffer_truncate_timed_out],
-
- ADD EVENT [sqlserver].[columnstore_tuple_mover_end_compress],
-
- ADD EVENT [sqlserver].[query_memory_grant_blocking],
-
- ADD EVENT [sqlserver].[natively_compiled_module_inefficiency_detected],
-
- ADD EVENT [sqlserver].[natively_compiled_proc_slow_parameter_passing],
-
- ADD EVENT [sqlserver].[xtp_alter_table],
-
- ADD EVENT [sqlserver].[xtp_db_delete_only_mode_updatedhktrimlsn],
-
- ADD EVENT [sqlserver].[xtp_stgif_container_added],
-
- ADD EVENT [sqlserver].[xtp_stgif_container_deleted],
-
- ADD EVENT [xtpcompile].[cl_duration],
-
- ADD EVENT [xtpengine].[xtp_physical_db_restarted],
-
- ADD EVENT [xtpengine].[xtp_db_delete_only_mode_enter],
-
- ADD EVENT [xtpengine].[xtp_db_delete_only_mode_update],
-
- ADD EVENT [xtpengine].[xtp_db_delete_only_mode_exit],
-
- ADD EVENT [xtpengine].[parallel_alter_stats],
-
- ADD EVENT [xtpengine].[serial_alter_stats],
-
- ADD EVENT [sqlserver].[json_function_compiled]
-(
-ACTION ([database_id])
-),
-
- ADD EVENT [sqlserver].[string_escape_compiled]
-(
-ACTION ([database_id])
-),
-
- ADD EVENT [sqlserver].[window_function_used]
-(
-ACTION ([database_id])
-),
-
- ADD EVENT [sqlserver].[sequence_function_used]
-(
-ACTION ([database_id])
-),
-
- ADD EVENT [qds].[query_store_db_diagnostics],
-
- ADD EVENT [sqlserver].[index_defragmentation],
-
- ADD EVENT [sqlserver].[create_index_event],
-
- ADD EVENT [sqlserver].[index_build_error_event],
-
- ADD EVENT [sqlserver].[alter_column_event],
-
- ADD EVENT [sqlserver].[cardinality_estimation_version_usage],
-
- ADD EVENT [sqlserver].[query_optimizer_compatibility_level_hint_usage],
-
- ADD EVENT [sqlserver].[query_tsql_scalar_udf_inlined],
-
- ADD EVENT [sqlserver].[tsql_scalar_udf_not_inlineable],
-
- ADD EVENT [sqlserver].[recovery_checkpoint_stats],
-
- ADD EVENT [sqlserver].[multistep_execution]
-(
-ACTION ([database_id])
-),
-
- ADD EVENT [sqlserver].[fulltext_filter_usage],
-
- ADD EVENT [sqlserver].[tx_commit_abort_stats],
-
- ADD EVENT [sqlserver].[server_start_stop]
-add target package0.ring_buffer
-(set occurrence_number = 100)
-with
-(
-	MAX_DISPATCH_LATENCY = 120 SECONDS,
-	MAX_MEMORY = 4 MB,
-	startup_state = on
-)
-if not exists (select * from sys.dm_xe_sessions where name = 'telemetry_xevents')
-	alter event session telemetry_xevents on server state=start
-",0,0,0,b'n\xfb\xa4k-\x06\x02\x9c',b'\xad\xcbN\xe0\xaa\xda\x10A',15,,,
+",0,0,0,b'n\xfb\xa4k-\x06\x02\x9c',b'\xad\xcbN\xe0\xaa\xda\x10A',4,,,
+8,"SELECT target_data
+									FROM sys.dm_xe_session_targets xet WITH(nolock)
+									JOIN sys.dm_xe_sessions xes WITH(nolock)
+									ON xes.address = xet.event_session_address
+									WHERE xes.name = 'telemetry_xevents'
+									AND xet.target_name = 'ring_buffer'",2,1,1,b'R\xb3\xb6\xce\xdeo\xc5z',b'\x99\xe4 9\xe9(\xe3\xd9',26,,,
 9,"
            
        DECLARE @msticks bigint, @mstickstime datetime, @LastHour datetime
@@ -678,7 +678,7 @@ if not exists (select * from sys.dm_xe_sessions where name = 'telemetry_xevents'
                      INNER JOIN Quartiles q
                            ON q.EventDate = ss.EventDate
                            AND q.EventTime = ss.EventTime
-     ",1,1,1,b'k\x19\x0bZ&\xbbo\xdb',b'\xbcA\xc3sz\xf6c\xea',14,,,
+     ",1,1,1,b'k\x19\x0bZ&\xbbo\xdb',b'\xbcA\xc3sz\xf6c\xea',3,,,
 10,"
            
        DECLARE @msticks bigint, @mstickstime datetime, @LastHour datetime
@@ -747,7 +747,7 @@ if not exists (select * from sys.dm_xe_sessions where name = 'telemetry_xevents'
                      INNER JOIN Quartiles q
                            ON q.EventDate = ss.EventDate
                            AND q.EventTime = ss.EventTime
-     ",0,0,1,b'n\x87\xac\xc6\xe9F\x7fw',b'\xb5\xb4\xf0]\x85\xb06`',14,,,
+     ",0,0,1,b'n\x87\xac\xc6\xe9F\x7fw',b'\xb5\xb4\xf0]\x85\xb06`',3,,,
 11,"CREATE PROC sys.sp_flush_commit_table_on_demand (@numrows as BIGINT = NULL, @deleted_rows BIGINT = NULL OUTPUT, @date_cleanedup DATETIME = NULL OUTPUT, @cleanup_ts BIGINT = NULL OUTPUT) AS
 BEGIN
 
@@ -809,7 +809,7 @@ BEGIN
 		TRUNCATE TABLE sys.syscommittab
 
 END
-",0,0,0,b'\x95LKk\xcb\xea\xad\xc5',b'\xbb\x81Y\xdf\xf0V\x00\xbf',26,,,
+",0,0,0,b'\x95LKk\xcb\xea\xad\xc5',b'\xbb\x81Y\xdf\xf0V\x00\xbf',4,,,
 12,"CREATE PROC sys.sp_flush_commit_table_on_demand (@numrows as BIGINT = NULL, @deleted_rows BIGINT = NULL OUTPUT, @date_cleanedup DATETIME = NULL OUTPUT, @cleanup_ts BIGINT = NULL OUTPUT) AS
 BEGIN
 
@@ -871,7 +871,7 @@ BEGIN
 		TRUNCATE TABLE sys.syscommittab
 
 END
-",0,0,0,"b'\x8a\xa7*""\xc8\t4\x97'",b'\xee\xeb\xd2{\xb8L\xd7\xaa',26,,,
+",0,0,0,"b'\x8a\xa7*""\xc8\t4\x97'",b'\xee\xeb\xd2{\xb8L\xd7\xaa',4,,,
 13,"SELECT  TOP 30 d.[name]
 FROM    sys.databases d WITH(nolock)
 	   INNER JOIN sys.master_files mf WITH(nolock)
@@ -890,7 +890,7 @@ AND DATABASEPROPERTYEX(d.[name], 'Collation') IS NOT NULL -- started
 AND ISNULL(hadr.[database_state], 0) = 0 -- online in HADR
 GROUP BY d.[name] 
 ORDER BY SUM(mf.size) DESC -- sampling using size
-",1,0,0,b'\xdf\x7f&\xcd\xda\x1c\x98\xc3',b'\xb0\xc1iW:\xbb\x1e\xe2',1,,,
+",0,0,0,b'\xdf\x7f&\xcd\xda\x1c\x98\xc3',b'\xb0\xc1iW:\xbb\x1e\xe2',1,,,
 14,"
     SELECT  mf.database_id, db.is_accelerated_database_recovery_on, mf.size as 'Data Size'
 	,mf_logs.size as 'Log Size', mf.size * 8/1024 'Data Size (MB)',
@@ -1099,7 +1099,7 @@ ORDER BY SUM(mf.size) DESC -- sampling using size
       where fs.database_id = mf.database_id and fs.file_id = mf.file_id and (fs.database_id = 1 OR fs.database_id = 3 OR fs.database_id = 4) and (fs.num_of_reads != 0 OR fs.num_of_writes != 0)
       group by mf.type, mf.type_desc
 
-    ",2,4,4,b'\xd1\xdex\xae\xefo\x0cD',b'\x1e\x96\xb9\xd3\n=%j',1,,,
+    ",1,4,4,b'\xd1\xdex\xae\xefo\x0cD',b'\x1e\x96\xb9\xd3\n=%j',1,,,
 37,"
       SELECT b1.device_type,
       ISNULL(b1.[type],'NULL') AS backup_type,
