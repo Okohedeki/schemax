@@ -52,8 +52,10 @@ const Dashboard = () => {
       <div style={{ flex: 1 }}>
         <div style={{ display: 'flex', height: '100%' }}>
           <div style={{ width: '20%', background: '#f0f0f0' }}>
+            /
             <ul>
               <li style={{ cursor: 'pointer' }} onClick={() => setShowButtons(true)}>Schema Mapping</li>
+              <li style={{ cursor: 'pointer' }} onClick={() => setActiveComponent('DataDictionary')}>DataDictionary</li>
               <li style={{ cursor: 'pointer' }} onClick={() => setActiveComponent('Connections')}>Connections</li>
             </ul>
           </div>
