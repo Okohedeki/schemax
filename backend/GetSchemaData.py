@@ -3,6 +3,10 @@ import pandas as pl
 import yaml
 import time
 import warnings
+import json 
+from datetime import datetime
+from decimal import Decimal
+
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
@@ -13,6 +17,23 @@ class DatabaseConnector:
         self.database = database
         self.connection = None
         self.queries = None  # Dictionary to store queries loaded from YAML file
+
+    @staticmethod
+    def convert_to_serializable(obj):
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        elif isinstance(obj, (bytes, bytearray)):
+            try:
+                return obj.decode('utf-8')
+            except UnicodeDecodeError:
+                return obj.decode('utf-8', errors='ignore')
+        elif isinstance(obj, Decimal):
+            return str(obj)  # Convert Decimal to string
+        elif isinstance(obj, str):
+            return obj.encode('utf-8').decode('utf-8')  # Convert to UTF-8
+        else:
+            return str(obj).encode('utf-8').decode('utf-8')  # Convert to UTF-8
+
 
     def connect(self):
         try:
@@ -213,6 +234,51 @@ class DatabaseConnector:
             print(f"Error in get_all_query_hash_info: {e}")
             return None
 
+
+    def get_column_values_table_views(self, table_df, view_df):
+        data_dict = {}
+
+        # Execute queries for tables
+        for table_name in table_df['TABLE_NAME'].unique():
+            query = f"SELECT TOP 1 * FROM [{table_name}]"
+            cursor = self.connection.cursor()
+            cursor.execute(query)
+            data = cursor.fetchone()
+
+            if data is not None:
+
+                # Get column names
+                columns = [column[0] for column in cursor.description]
+                # Create dictionary for table data
+                table_data = {}
+                for column, value in zip(columns, data):
+                    table_data[column] = value
+
+                # Add table data to data_dict with a level indicating it's a table
+                data_dict[table_name] = {'type': 'table', 'data': table_data}
+
+        # Execute queries for views
+        for view_name in view_df['VIEW_NAME'].unique():
+            query = f"SELECT TOP 1 * FROM [{view_name}]"
+            cursor = self.connection.cursor()
+            cursor.execute(query)
+            data = cursor.fetchone()
+
+            if data is not None:
+                # Get column names
+                columns = [column[0] for column in cursor.description]
+
+                # Create dictionary for view data
+                view_data = {}
+                for column, value in zip(columns, data):
+                    view_data[column] = value
+
+            # Add view data to data_dict with a level indicating it's a view
+            data_dict[view_name] = {'type': 'view', 'data': view_data}
+
+        # Convert data_dict to JSON and return
+        return json.dumps(data_dict, default=self.convert_to_serializable, indent=4)
+
     def close_connection(self):
         if self.connection:
             self.connection.close()
@@ -243,6 +309,9 @@ if __name__ == "__main__":
     constraints_df = general_query_dict.get('get_all_constraints_keys')
     views_df = general_query_dict.get('get_all_views')
     recent_queries_df = general_query_dict.get('get_recent_queries')
+
+    columndatas = db_connector.get_column_values_table_views(table_df, views_df)
+    print(columndatas)
 
     db_connector.reset_yaml_queries()
     db_connector.load_queries_from_yaml(yaml_file_table)  # Load queries from YAML file
